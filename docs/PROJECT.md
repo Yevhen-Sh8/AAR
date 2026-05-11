@@ -30,9 +30,13 @@
 ## 3. Поточний статус
 
 - **Версія концепції**: v2.0
-- **Поточний етап**: Етап 0 — концепція в гілці, чекаємо схвалення.
+- **Поточний етап**: Етап 1 — скелет монорепо.
 - **Гілка розробки**: `claude/equipment-tracking-system-3lB6U`
-- **Найближчі дії**: Етап 1 — скелет монорепо після схвалення концепції.
+- **Найближчі дії**: Етап 2 — модель даних і довідники (`Item`, `ItemType`,
+  `Operator`, `LossReason`, `RepairReason`, `UsageEvent`, `AARCase`).
+- **Що вже є**: FastAPI з `/health` + JWT-утиліти, React+Vite PWA скелет
+  (3 сторінки), Alembic з першою міграцією (users), docker-compose,
+  GitHub Actions CI, спільний `packages/shared/classifiers.json`.
 
 ## 4. Стек і середовище (узгоджено)
 

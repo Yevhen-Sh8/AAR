@@ -4,6 +4,41 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v0.1.0-skeleton] — 2026-05-11
+
+### Added (Етап 1 — скелет монорепо)
+- `apps/api`: FastAPI + SQLAlchemy 2 + Alembic; ендпоінт `/health`;
+  JWT-утиліти (`core/security.py`), модель `User` з ролями
+  (`participant/analyst/manager/admin/integrator`).
+- `apps/web`: React 18 + Vite + TypeScript + PWA (Workbox); сторінки
+  Дашборд / Події / AAR-кейси; роутинг через react-router.
+- `infra/docker-compose.yml`: Postgres 16, Redis 7, api, web.
+- `packages/shared/classifiers.json`: початкові класифікатори
+  (А/Б, a–e, a–r) з посиланням на зону відповідальності.
+- CI (`.github/workflows/ci.yml`): ruff, mypy, pytest для API;
+  build + vitest для web.
+- `.env.example`, `.gitignore`, Dockerfile для обох застосунків.
+- Початкова міграція Alembic `0001_initial` (таблиця `users`).
+
+### Changed
+- `docs/PROJECT.md`: статус оновлено до Етап 1.
+
+### Fixed (по результатах архітектурного ревʼю Plan-агента)
+- CI: прибрано npm cache (немає lockfile), додано окремий tsc-крок.
+- API: FastAPI змонтовано на `root_path="/api"`; `/health/live` + `/health/ready`
+  з пінгом БД; CORS — лише локальні origin замість `*`; fail-fast на JWT
+  secret поза dev.
+- Dockerfile API: правильний порядок COPY перед `pip install -e .`,
+  додано `setuptools.packages.find` і non-root user; `.dockerignore`
+  для api та web.
+- nginx: узгоджено префікс `/api/`, додано security headers (CSP, XFO,
+  Referrer-Policy, X-Content-Type-Options).
+- mypy: пом'якшено зі `strict=true` до `warn_unused_ignores/redundant_casts`,
+  щоб CI не валився на python-jose / passlib без стабів.
+- Прибрано `schemas/auth.py` — auth-роутер з'явиться на Етапі 2.
+- Модель `User.role` тепер `sa.Enum(Role, native_enum=False)` замість сирого
+  `String`.
+
 ## [v2.0-concept] — 2026-05-11
 
 ### Added

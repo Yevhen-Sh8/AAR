@@ -1,0 +1,24 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from aar_api import __version__
+from aar_api.core.config import get_settings
+from aar_api.routers import health
+
+settings = get_settings()
+
+if settings.environment != "development" and settings.jwt_secret == "change-me-in-production":
+    raise RuntimeError("AAR_JWT_SECRET must be set in non-development environments")
+
+app = FastAPI(title=settings.app_name, version=__version__, root_path="/api")
+
+allowed = ["http://localhost:5173", "http://localhost:8080"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(health.router)

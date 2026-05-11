@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aar
+      POSTGRES_PASSWORD: aar
+      POSTGRES_DB: aar
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aar"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build: ../apps/api
+    environment:
+      AAR_DATABASE_URL: postgresql+asyncpg://aar:aar@db:5432/aar
+      AAR_REDIS_URL: redis://redis:6379/0
+      AAR_JWT_SECRET: change-me
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head && uvicorn aar_api.main:app --host 0.0.0.0 --port 8000"
+
+  web:
+    build: ../apps/web
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  db_data:
