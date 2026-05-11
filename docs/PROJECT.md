@@ -31,10 +31,10 @@
 ## 3. Поточний статус
 
 - **Версія концепції**: v2.0
-- **Поточний етап**: Етап 5 — AAR-кейси + тригери.
+- **Поточний етап**: Етап 6 — LLM-автоматизація через Claude API.
 - **Гілка розробки**: `claude/equipment-tracking-system-3lB6U`
-- **Найближчі дії**: Етап 6 — LLM-автоматизація (Claude API: класифікація
-  причин, драфт висновків, пошук аналогій у базі знань).
+- **Найближчі дії**: Етап 7 — offline-first PWA (Workbox, IndexedDB,
+  sync-черга, конфлікт-резолюшн).
 - **Що вже є**:
   - 11 моделей: `User`, `ItemType`, `Operator`, `LossReason`, `RepairReason`,
     `Item`, `UsageEvent`, `AARCase`, `IndividualReport`, `Recommendation`,

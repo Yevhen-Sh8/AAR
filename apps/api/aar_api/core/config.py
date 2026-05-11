@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 8
 
+    anthropic_api_key: str = ""
+    llm_default_model: str = "claude-sonnet-4-6"
+    llm_fast_model: str = "claude-haiku-4-5"
+    llm_enabled: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -4,6 +4,42 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v0.7.0-llm] — 2026-05-11
+
+### Added (Етап 6 — LLM-автоматизація через Claude API)
+- Залежність `anthropic>=0.40` + конфіг: `AAR_ANTHROPIC_API_KEY`,
+  `AAR_LLM_DEFAULT_MODEL` (default `claude-sonnet-4-6`),
+  `AAR_LLM_FAST_MODEL` (default `claude-haiku-4-5`), `AAR_LLM_ENABLED`.
+- `services/llm.py`:
+  - **A8** `classify_reason(text, catalog, kind)` — мапить вільнотекстовий
+    опис у код причини (а–д / а–р) з `confidence` і `rationale`.
+    Використовує Haiku 4.5 за замовч., output_config JSON-schema, prompt
+    caching на словнику причин (ephemeral, cache_control на каталозі).
+  - **A9** `draft_case_analysis(...)` — Markdown-драфт підсумкового
+    аналізу менеджера (6 секцій: контекст / що сталося / чому / спрацювало /
+    не спрацювало / рекомендації). Sonnet 4.6.
+  - **A10** `find_analogies(query, knowledge_entries, top_k)` — ранжування
+    записів `KnowledgeEntry` за релевантністю до нового кейсу через
+    structured outputs.
+- REST `/llm/*`:
+  - `POST /llm/classify-reason` (підбирає словник за `kind`).
+  - `POST /llm/cases/{id}/draft-analysis` (агрегує події оператора +
+    індивідуальні звіти, передає у драфт).
+  - `GET /llm/cases/{id}/analogies?top_k=3`.
+- Усі ендпоінти повертають `503 LLM disabled` коли API ключ не
+  сконфігуровано → ручні режими роботи завжди доступні.
+- Тести (з `unittest.mock.patch`): 503 без ключа, мокована класифікація,
+  виклик `draft_case_analysis` з правильним контекстом кейсу, порожні
+  аналогії при порожній базі знань.
+
+### Notes on Anthropic SDK usage
+- Системні промпти структуровано як список `text`-блоків;
+  `cache_control={"type": "ephemeral"}` стоїть на стабільному префіксі
+  (каталог причин, instructions грейдера), а вільний користувацький текст
+  іде у `messages[-1]` після останнього breakpoint.
+- Логуються `usage.cache_read_input_tokens` /
+  `usage.cache_creation_input_tokens` — для аудиту хіт-рейту.
+
 ## [v0.6.0-metrics] — 2026-05-11
 
 ### Changed (рефакторинг назв метрик до наукової нотації)
