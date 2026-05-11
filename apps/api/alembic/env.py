@@ -1,11 +1,11 @@
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+import aar_api.models  # noqa: F401  registers models for autogenerate
 from aar_api.core.config import get_settings
 from aar_api.core.db import Base
-import aar_api.models  # noqa: F401  registers models
+from alembic import context
 
 config = context.config
 if config.config_file_name is not None:
