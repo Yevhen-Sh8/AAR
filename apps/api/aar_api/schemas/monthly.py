@@ -10,15 +10,15 @@ class OperatorMonth(BaseModel):
     lost: int
     repaired: int
     success: int
-    keff: float           # У / З
-    keff_obsl: float      # У / (З − зовнішні − виробничі)
-    kv_obsl: float        # втрати "зони обслуги" / З
-    delta_keff_pp: float  # vs попередній місяць, у відсоткових пунктах
+    msr: float           # η, Mission Success Rate = success / launched
+    msr_c: float         # η_c, Crew-adjusted MSR = success / (launched − ext − mfg losses)
+    clr: float           # λ_c, Crew Loss Rate = crew-attributable losses / launched
+    delta_msr_pp: float  # Δη vs previous month, in percentage points
 
 
 class OperatorRating(BaseModel):
     operator_code: str
-    keff_obsl: float
+    msr_c: float
     category: str         # "high" | "ok" | "needs_training"
     rank: int
 
@@ -33,8 +33,8 @@ class ReasonZoneSummary(BaseModel):
 
 class OperatorTrend(BaseModel):
     operator_code: str
-    keff_prev_month: float | None
-    keff_this_month: float
+    msr_prev: float | None
+    msr_this: float
     trend: str            # "up" | "down" | "flat"
 
 

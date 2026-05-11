@@ -15,10 +15,10 @@ class CaseStatus(StrEnum):
 
 class TriggerType(StrEnum):
     MANUAL = "manual"
-    KEFF_DROP = "keff_drop"  # T1
+    MSR_DROP = "msr_drop"  # T1: MSR_c below threshold N consecutive days
     REPEATED_REASON = "repeated_reason"  # T2
     ITEM_ANOMALY = "item_anomaly"  # T3
-    ENTERPRISE_DROP = "enterprise_drop"  # T4
+    ENTERPRISE_DROP = "enterprise_drop"  # T4: enterprise MSR drop d-o-d
 
 
 class RecommendationStatus(StrEnum):

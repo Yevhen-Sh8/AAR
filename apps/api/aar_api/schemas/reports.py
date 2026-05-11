@@ -12,7 +12,7 @@ class DailyRow(BaseModel):
     lost: int
     repaired: int
     success: int
-    keff: float  # 0..1
+    msr: float  # Mission Success Rate, η = success / launched
 
 
 class LossReasonBreakdown(BaseModel):

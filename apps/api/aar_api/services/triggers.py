@@ -1,9 +1,9 @@
 """Auto-trigger engine for AAR cases (T1..T4).
 
-T1: operator Кеф_обсл below threshold for N consecutive days
+T1: operator η_c (MSR_c) below threshold for N consecutive days
 T2: same loss/repair reason repeated K+ times within a window
 T3: anomaly on a single serial number (M+ repairs/losses within a window)
-T4: enterprise-wide Кеф dropped by more than P percentage points day-over-day
+T4: enterprise-wide η (MSR) dropped by more than P percentage points day-over-day
 """
 from collections import defaultdict
 from dataclasses import dataclass
@@ -20,7 +20,7 @@ from aar_api.models.event import Item, Outcome, UsageEvent
 
 @dataclass(frozen=True)
 class TriggerConfig:
-    t1_threshold: float = 0.70
+    t1_msr_c_threshold: float = 0.70
     t1_consecutive_days: int = 3
     t2_repeat_count: int = 3
     t2_window_days: int = 7
@@ -57,7 +57,7 @@ async def _events_in_range(
     return list(await session.execute(stmt))
 
 
-def _keff_obsl(events: list) -> float | None:
+def _msr_c(events: list) -> float | None:
     launched = len(events)
     if not launched:
         return None
@@ -78,8 +78,8 @@ def _eval_t1(events: list, cfg: TriggerConfig, today: date) -> list[tuple[str, i
     operators = {(op, op_id) for (op, op_id, _) in by_op_day}
     for op_code, op_id in operators:
         days = [today - timedelta(days=i) for i in range(cfg.t1_consecutive_days)]
-        keffs = [_keff_obsl(by_op_day.get((op_code, op_id, d), [])) for d in days]
-        if all(k is not None and k < cfg.t1_threshold for k in keffs):
+        msr_values = [_msr_c(by_op_day.get((op_code, op_id, d), [])) for d in days]
+        if all(k is not None and k < cfg.t1_msr_c_threshold for k in msr_values):
             out.append((op_code, op_id))
     return out
 
@@ -115,9 +115,9 @@ def _eval_t4(events: list, cfg: TriggerConfig, today: date) -> bool:
     yest_events = [e for e in events if e.event_date == yest]
     if not today_events or not yest_events:
         return False
-    today_keff = sum(1 for e in today_events if e.outcome == Outcome.SUCCESS) / len(today_events)
-    yest_keff = sum(1 for e in yest_events if e.outcome == Outcome.SUCCESS) / len(yest_events)
-    return (yest_keff - today_keff) * 100 > cfg.t4_drop_pp
+    today_msr = sum(1 for e in today_events if e.outcome == Outcome.SUCCESS) / len(today_events)
+    yest_msr = sum(1 for e in yest_events if e.outcome == Outcome.SUCCESS) / len(yest_events)
+    return (yest_msr - today_msr) * 100 > cfg.t4_drop_pp
 
 
 async def _signature_exists(session: AsyncSession, signature: str) -> bool:
@@ -145,8 +145,8 @@ async def evaluate_triggers(
             skipped += 1
             continue
         case = AARCase(
-            title=f"Зниження Кеф_обсл у {op_code} [{sig}]",
-            trigger=TriggerType.KEFF_DROP,
+            title=f"Зниження MSR_c у {op_code} [{sig}]",
+            trigger=TriggerType.MSR_DROP,
             operator_id=op_id,
         )
         session.add(case)
@@ -182,7 +182,7 @@ async def evaluate_triggers(
             skipped += 1
         else:
             case = AARCase(
-                title=f"Падіння Кеф підприємства > {cfg.t4_drop_pp} в.п. [{sig}]",
+                title=f"Падіння MSR підприємства > {cfg.t4_drop_pp} в.п. [{sig}]",
                 trigger=TriggerType.ENTERPRISE_DROP,
             )
             session.add(case)

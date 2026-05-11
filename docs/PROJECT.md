@@ -10,7 +10,7 @@
 Цифрова платформа **AAR (After Action Review)** — система аналізу і
 накопичення досвіду. Розширена концепція v2.0 включає окремий модуль
 **«Облік і ефективність виробів»** (пономерний облік, причини а–д / а–р,
-Кеф, рейтинг експлуатантів, авто-тригери AAR-кейсів).
+η (MSR), рейтинг експлуатантів, авто-тригери AAR-кейсів).
 
 ## 2. Куди дивитися (карта документації)
 
@@ -19,6 +19,7 @@
 | Філософія, що ми будуємо | [`docs/concept/AAR_v2.md`](concept/AAR_v2.md) |
 | Що саме і коли робимо | [`docs/roadmap.md`](roadmap.md) |
 | Які процеси автоматизуються | [`docs/automation.md`](automation.md) |
+| Метрики (MSR, MSR_c, CLR), нотація | [`docs/metrics.md`](metrics.md) |
 | Як виглядає щоденна довідка | [`docs/forms/daily-template.md`](forms/daily-template.md) |
 | Як виглядає місячна звітність | [`docs/forms/monthly-template.md`](forms/monthly-template.md) |
 | Нормативна база | [`docs/normative/README.md`](normative/README.md) |

@@ -1,3 +1,4 @@
+"""Monthly aggregation: η (MSR), η_c (MSR_c), λ_c (CLR), Δη, rating, zones, trends."""
 from calendar import monthrange
 from collections import defaultdict
 from datetime import date
@@ -16,6 +17,7 @@ from aar_api.schemas.monthly import (
     ReasonZoneSummary,
 )
 
+# η_c (crew-adjusted MSR) thresholds for rating buckets.
 HIGH_THRESHOLD = 0.85
 OK_THRESHOLD = 0.70
 
@@ -28,10 +30,10 @@ def _prev_month(year: int, month: int) -> tuple[int, int]:
     return (year - 1, 12) if month == 1 else (year, month - 1)
 
 
-def _category(keff_obsl: float) -> str:
-    if keff_obsl >= HIGH_THRESHOLD:
+def _category(msr_c: float) -> str:
+    if msr_c >= HIGH_THRESHOLD:
         return "high"
-    if keff_obsl >= OK_THRESHOLD:
+    if msr_c >= OK_THRESHOLD:
         return "ok"
     return "needs_training"
 
@@ -104,16 +106,16 @@ def _round(value: float) -> float:
 
 
 def _operator_month(operator_code: str, item_type_code: str, c: dict[str, int],
-                    prev_keff: float | None) -> OperatorMonth:
+                    prev_msr: float | None) -> OperatorMonth:
     launched = c["launched"]
     success = c["success"]
-    keff = _round(success / launched) if launched else 0.0
-    not_operator = c["lost_external"] + c["lost_mfg"]
-    cleaned = launched - not_operator
-    keff_obsl = _round(success / cleaned) if cleaned else 0.0
-    op_losses = c["lost_op"] + c["rep_op"]
-    kv_obsl = _round(op_losses / launched) if launched else 0.0
-    delta_pp = _round((keff - prev_keff) * 100) if prev_keff is not None else 0.0
+    msr = _round(success / launched) if launched else 0.0
+    not_crew = c["lost_external"] + c["lost_mfg"]
+    cleaned = launched - not_crew
+    msr_c = _round(success / cleaned) if cleaned else 0.0
+    crew_losses = c["lost_op"] + c["rep_op"]
+    clr = _round(crew_losses / launched) if launched else 0.0
+    delta_pp = _round((msr - prev_msr) * 100) if prev_msr is not None else 0.0
     return OperatorMonth(
         operator_code=operator_code,
         item_type_code=item_type_code,
@@ -121,10 +123,10 @@ def _operator_month(operator_code: str, item_type_code: str, c: dict[str, int],
         lost=c["lost"],
         repaired=c["repaired"],
         success=success,
-        keff=keff,
-        keff_obsl=keff_obsl,
-        kv_obsl=kv_obsl,
-        delta_keff_pp=delta_pp,
+        msr=msr,
+        msr_c=msr_c,
+        clr=clr,
+        delta_msr_pp=delta_pp,
     )
 
 
@@ -140,7 +142,7 @@ async def build_monthly_report(session: AsyncSession, year: int, month: int) -> 
     for row in prev_rows_db:
         _accumulate(prev_bucket, (row.operator_code, row.item_type_code), row)
 
-    def _prev_keff(key: tuple[str, str]) -> float | None:
+    def _prev_msr(key: tuple[str, str]) -> float | None:
         p = prev_bucket.get(key)
         if p is None or not p["launched"]:
             return None
@@ -149,12 +151,12 @@ async def build_monthly_report(session: AsyncSession, year: int, month: int) -> 
     rows: list[OperatorMonth] = []
     totals = _zero()
     for key, counts in sorted(bucket.items()):
-        rows.append(_operator_month(key[0], key[1], counts, _prev_keff(key)))
+        rows.append(_operator_month(key[0], key[1], counts, _prev_msr(key)))
         for k in totals:
             totals[k] += counts[k]
     totals_row = _operator_month("TOTAL", "ALL", totals, None)
 
-    # Rating per operator across all types
+    # Rating per operator (η_c across all item types).
     by_op: dict[str, dict[str, int]] = defaultdict(_zero)
     for (op_code, _), counts in bucket.items():
         for k in by_op[op_code]:
@@ -162,16 +164,15 @@ async def build_monthly_report(session: AsyncSession, year: int, month: int) -> 
     rating_rows: list[OperatorRating] = []
     for op_code, c in by_op.items():
         cleaned = c["launched"] - c["lost_external"] - c["lost_mfg"]
-        keff_obsl = _round(c["success"] / cleaned) if cleaned else 0.0
+        msr_c = _round(c["success"] / cleaned) if cleaned else 0.0
         rating_rows.append(
-            OperatorRating(operator_code=op_code, keff_obsl=keff_obsl,
-                           category=_category(keff_obsl), rank=0)
+            OperatorRating(operator_code=op_code, msr_c=msr_c,
+                           category=_category(msr_c), rank=0)
         )
-    rating_rows.sort(key=lambda r: (-r.keff_obsl, r.operator_code))
+    rating_rows.sort(key=lambda r: (-r.msr_c, r.operator_code))
     for i, row in enumerate(rating_rows, start=1):
         row.rank = i
 
-    # Zone summary across enterprise
     zone_acc: dict[Zone, dict[str, int]] = {z: {"losses": 0, "repairs": 0} for z in Zone}
     for row in rows_db:
         if row.outcome == Outcome.LOST and row.loss_zone:
@@ -188,7 +189,7 @@ async def build_monthly_report(session: AsyncSession, year: int, month: int) -> 
             )
         )
 
-    # Trends per operator (any type)
+    # Trends per operator (η).
     this_op: dict[str, dict[str, int]] = defaultdict(_zero)
     prev_op: dict[str, dict[str, int]] = defaultdict(_zero)
     for (op_code, _), c in bucket.items():
@@ -199,22 +200,22 @@ async def build_monthly_report(session: AsyncSession, year: int, month: int) -> 
             prev_op[op_code][k] += c[k]
     trends: list[OperatorTrend] = []
     for op_code, c in this_op.items():
-        this_keff = _round(c["success"] / c["launched"]) if c["launched"] else 0.0
+        this_msr = _round(c["success"] / c["launched"]) if c["launched"] else 0.0
         p = prev_op.get(op_code)
-        prev_keff_value: float | None = None
+        prev_msr_value: float | None = None
         if p and p["launched"]:
-            prev_keff_value = _round(p["success"] / p["launched"])
-        if prev_keff_value is None:
+            prev_msr_value = _round(p["success"] / p["launched"])
+        if prev_msr_value is None:
             label = "flat"
-        elif this_keff > prev_keff_value:
+        elif this_msr > prev_msr_value:
             label = "up"
-        elif this_keff < prev_keff_value:
+        elif this_msr < prev_msr_value:
             label = "down"
         else:
             label = "flat"
         trends.append(
-            OperatorTrend(operator_code=op_code, keff_prev_month=prev_keff_value,
-                          keff_this_month=this_keff, trend=label)
+            OperatorTrend(operator_code=op_code, msr_prev=prev_msr_value,
+                          msr_this=this_msr, trend=label)
         )
     trends.sort(key=lambda t: t.operator_code)
 

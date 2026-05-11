@@ -51,7 +51,7 @@ async def test_daily_report_aggregation() -> None:
         assert rows["E-01"]["success"] == 3
         assert rows["E-01"]["lost"] == 1
         assert rows["E-01"]["repaired"] == 1
-        assert abs(rows["E-01"]["keff"] - 0.6) < 1e-6
+        assert abs(rows["E-01"]["msr"] - 0.6) < 1e-6
         assert rows["E-02"]["launched"] == 2
         assert body["totals"]["launched"] == 7
         assert body["totals"]["success"] == 5

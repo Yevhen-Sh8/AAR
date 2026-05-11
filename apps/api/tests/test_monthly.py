@@ -54,7 +54,7 @@ async def _seed_two_months() -> None:
         await s.commit()
 
 
-async def test_monthly_keff_obsl_and_trend() -> None:
+async def test_monthly_msr_c_and_trend() -> None:
     await _seed_two_months()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -64,9 +64,9 @@ async def test_monthly_keff_obsl_and_trend() -> None:
         rows = {row["operator_code"]: row for row in body["rows"]}
         assert rows["E-01"]["launched"] == 5
         assert rows["E-01"]["success"] == 5
-        assert rows["E-01"]["keff"] == 1.0
-        # Δ vs Nov: Dec keff=1.0, Nov keff = 6/8 = 0.75 → +25.0 в.п.
-        assert abs(rows["E-01"]["delta_keff_pp"] - 25.0) < 0.01
+        assert rows["E-01"]["msr"] == 1.0
+        # Dec MSR=1.0 vs Nov MSR=6/8=0.75 → Δη=+25.0 pp
+        assert abs(rows["E-01"]["delta_msr_pp"] - 25.0) < 0.01
 
         rating = {r["operator_code"]: r for r in body["rating"]}
         assert rating["E-01"]["category"] == "high"
@@ -74,7 +74,7 @@ async def test_monthly_keff_obsl_and_trend() -> None:
 
         trends = {t["operator_code"]: t for t in body["trends"]}
         assert trends["E-01"]["trend"] == "up"
-        assert trends["E-01"]["keff_prev_month"] == 0.75
+        assert trends["E-01"]["msr_prev"] == 0.75
 
 
 async def test_monthly_zones_aggregation_november() -> None:
@@ -86,9 +86,9 @@ async def test_monthly_zones_aggregation_november() -> None:
         zones = {z["zone"]: z for z in body["zones"]}
         assert zones["operator"]["losses"] == 1
         assert zones["external"]["losses"] == 1
-        # Кеф_обсл for E-01 in Nov = 6 / (8 - 1) = 6/7 ≈ 0.8571
+        # η_c for E-01 in Nov = 6 / (8 - 1) = 6/7 ≈ 0.8571
         rows = {row["operator_code"]: row for row in body["rows"]}
-        assert abs(rows["E-01"]["keff_obsl"] - round(6 / 7, 4)) < 1e-4
+        assert abs(rows["E-01"]["msr_c"] - round(6 / 7, 4)) < 1e-4
 
 
 async def test_monthly_xlsx_pdf() -> None:

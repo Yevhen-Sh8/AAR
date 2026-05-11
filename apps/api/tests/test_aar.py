@@ -13,7 +13,7 @@ TODAY = date(2025, 12, 15)
 
 
 async def _seed_t1() -> None:
-    """E-01: 3 consecutive days with Кеф_обсл below 0.70 (operator-zone losses)."""
+    """E-01: 3 consecutive days with η_c below 0.70 (operator-zone losses)."""
     Session = async_sessionmaker(_engine, expire_on_commit=False)
     async with Session() as s:
         a = ItemType(code="A", name_uk="A")
@@ -27,7 +27,7 @@ async def _seed_t1() -> None:
         idx = 0
         for offset in (2, 1, 0):
             d = TODAY - timedelta(days=offset)
-            # 5 launches, 2 success, 3 operator-zone losses → Кеф_обсл = 2/5 = 0.4
+            # 5 launches, 2 success, 3 operator-zone losses → η_c = 2/5 = 0.4
             for _ in range(2):
                 s.add(UsageEvent(item_id=items[idx].id, operator_id=e1.id,
                                  event_date=d, outcome=Outcome.SUCCESS))
@@ -63,7 +63,7 @@ async def _seed_t3() -> None:
         await s.commit()
 
 
-async def test_trigger_t1_creates_keff_drop_case() -> None:
+async def test_trigger_t1_creates_msr_drop_case() -> None:
     await _seed_t1()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -71,7 +71,7 @@ async def test_trigger_t1_creates_keff_drop_case() -> None:
         assert r.status_code == 200, r.text
         assert len(r.json()["created_case_ids"]) >= 1
         cases = (await client.get("/aar/cases")).json()
-        assert any("E-01" in c["title"] and c["trigger"] == "keff_drop" for c in cases)
+        assert any("E-01" in c["title"] and c["trigger"] == "msr_drop" for c in cases)
 
         # Idempotent: second run skips
         r2 = await client.post("/aar/run-triggers", params={"today": TODAY.isoformat()})

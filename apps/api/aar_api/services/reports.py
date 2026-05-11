@@ -17,7 +17,7 @@ from aar_api.schemas.reports import (
 )
 
 
-def _keff(success: int, launched: int) -> float:
+def _msr(success: int, launched: int) -> float:
     return round(success / launched, 4) if launched else 0.0
 
 
@@ -111,7 +111,7 @@ async def build_daily_report(session: AsyncSession, report_date: date) -> DailyR
                 lost=counts["lost"],
                 repaired=counts["repaired"],
                 success=counts["success"],
-                keff=_keff(counts["success"], counts["launched"]),
+                msr=_msr(counts["success"], counts["launched"]),
             )
         )
         for k in totals:
@@ -124,7 +124,7 @@ async def build_daily_report(session: AsyncSession, report_date: date) -> DailyR
         lost=totals["lost"],
         repaired=totals["repaired"],
         success=totals["success"],
-        keff=_keff(totals["success"], totals["launched"]),
+        msr=_msr(totals["success"], totals["launched"]),
     )
     return DailyReport(
         report_date=report_date,

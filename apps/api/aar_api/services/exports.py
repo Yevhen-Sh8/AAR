@@ -23,16 +23,16 @@ def daily_report_to_xlsx(report: DailyReport) -> bytes:
     ws.append([])
     ws.append(["Т.1. Зведені показники"])
     ws.cell(row=ws.max_row, column=1).font = bold
-    headers = ["Експлуатант", "Тип", "Запущено", "Втрачено", "Ремонт", "Успіх", "Кеф"]
+    headers = ["Експлуатант", "Тип", "Запущено", "Втрачено", "Ремонт", "Успіх", "η (MSR)"]
     ws.append(headers)
     for c in ws[ws.max_row]:
         c.font = bold
     for r in report.rows:
         ws.append([r.operator_code, r.item_type_code, r.launched, r.lost,
-                   r.repaired, r.success, r.keff])
+                   r.repaired, r.success, r.msr])
     t = report.totals
     ws.append([t.operator_code, t.item_type_code, t.launched, t.lost,
-               t.repaired, t.success, t.keff])
+               t.repaired, t.success, t.msr])
     for c in ws[ws.max_row]:
         c.font = bold
 
@@ -105,17 +105,17 @@ def daily_report_to_pdf(report: DailyReport) -> bytes:
         Paragraph("Т.1. Зведені показники", styles["Heading2"]),
     ]
     summary: list[list[object]] = [
-        ["Експлуатант", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх", "Кеф"]
+        ["Експлуатант", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх", "η (MSR)"]
     ]
     for r in report.rows:
         summary.append(
             [r.operator_code, r.item_type_code, r.launched, r.lost,
-             r.repaired, r.success, f"{r.keff:.2%}"]
+             r.repaired, r.success, f"{r.msr:.2%}"]
         )
     t = report.totals
     summary.append(
         [t.operator_code, t.item_type_code, t.launched, t.lost,
-         t.repaired, t.success, f"{t.keff:.2%}"]
+         t.repaired, t.success, f"{t.msr:.2%}"]
     )
     story.append(_table(summary))
 
@@ -150,31 +150,31 @@ def monthly_report_to_xlsx(report: MonthlyReport) -> bytes:
     ws.cell(row=ws.max_row, column=1).font = bold
     ws.append([
         "Експлуатант", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх",
-        "Кеф", "Кеф_обсл", "Кв_обсл", "Δ Кеф (в.п.)",
+        "η (MSR)", "η_c (MSR_c)", "λ_c (CLR)", "Δη (в.п.)",
     ])
     for c in ws[ws.max_row]:
         c.font = bold
     for r in report.rows:
         ws.append([
             r.operator_code, r.item_type_code, r.launched, r.lost, r.repaired,
-            r.success, r.keff, r.keff_obsl, r.kv_obsl, r.delta_keff_pp,
+            r.success, r.msr, r.msr_c, r.clr, r.delta_msr_pp,
         ])
     t = report.totals
     ws.append([
         t.operator_code, t.item_type_code, t.launched, t.lost, t.repaired,
-        t.success, t.keff, t.keff_obsl, t.kv_obsl, t.delta_keff_pp,
+        t.success, t.msr, t.msr_c, t.clr, t.delta_msr_pp,
     ])
     for c in ws[ws.max_row]:
         c.font = bold
 
     ws.append([])
-    ws.append(["Рейтинг експлуатантів за Кеф_обсл"])
+    ws.append(["Рейтинг експлуатантів за η_c"])
     ws.cell(row=ws.max_row, column=1).font = bold
-    ws.append(["Місце", "Експлуатант", "Кеф_обсл", "Категорія"])
+    ws.append(["Місце", "Експлуатант", "η_c (MSR_c)", "Категорія"])
     for c in ws[ws.max_row]:
         c.font = bold
     for rt in report.rating:
-        ws.append([rt.rank, rt.operator_code, rt.keff_obsl, rt.category])
+        ws.append([rt.rank, rt.operator_code, rt.msr_c, rt.category])
 
     ws.append([])
     ws.append(["Т.7. Зони відповідальності"])
@@ -188,14 +188,14 @@ def monthly_report_to_xlsx(report: MonthlyReport) -> bytes:
     ws.append([])
     ws.append(["Т.6. Динаміка vs попередній місяць"])
     ws.cell(row=ws.max_row, column=1).font = bold
-    ws.append(["Експлуатант", "Кеф попер.", "Кеф поточ.", "Тренд"])
+    ws.append(["Експлуатант", "η попер.", "η поточ.", "Тренд"])
     for c in ws[ws.max_row]:
         c.font = bold
     for tr in report.trends:
         ws.append([
             tr.operator_code,
-            tr.keff_prev_month if tr.keff_prev_month is not None else "-",
-            tr.keff_this_month, tr.trend,
+            tr.msr_prev if tr.msr_prev is not None else "-",
+            tr.msr_this, tr.trend,
         ])
 
     buf = BytesIO()
@@ -214,25 +214,25 @@ def monthly_report_to_pdf(report: MonthlyReport) -> bytes:
     ]
     integral: list[list[object]] = [[
         "Експл.", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх",
-        "Кеф", "Кеф_обсл", "Кв_обсл", "Δ Кеф",
+        "η (MSR)", "η_c (MSR_c)", "λ_c (CLR)", "Δη",
     ]]
     for r in report.rows:
         integral.append([
             r.operator_code, r.item_type_code, r.launched, r.lost, r.repaired,
-            r.success, f"{r.keff:.2%}", f"{r.keff_obsl:.2%}",
-            f"{r.kv_obsl:.2%}", f"{r.delta_keff_pp:+.1f}",
+            r.success, f"{r.msr:.2%}", f"{r.msr_c:.2%}",
+            f"{r.clr:.2%}", f"{r.delta_msr_pp:+.1f}",
         ])
     t = report.totals
     integral.append([
         t.operator_code, t.item_type_code, t.launched, t.lost, t.repaired,
-        t.success, f"{t.keff:.2%}", f"{t.keff_obsl:.2%}",
-        f"{t.kv_obsl:.2%}", f"{t.delta_keff_pp:+.1f}",
+        t.success, f"{t.msr:.2%}", f"{t.msr_c:.2%}",
+        f"{t.clr:.2%}", f"{t.delta_msr_pp:+.1f}",
     ])
     story.append(_table(integral))
 
     story.extend([Spacer(1, 12), Paragraph("Рейтинг експлуатантів", styles["Heading2"])])
-    rating: list[list[object]] = [["Місце", "Експлуатант", "Кеф_обсл", "Категорія"]]
-    rating.extend([r.rank, r.operator_code, f"{r.keff_obsl:.2%}", r.category]
+    rating: list[list[object]] = [["Місце", "Експлуатант", "η_c (MSR_c)", "Категорія"]]
+    rating.extend([r.rank, r.operator_code, f"{r.msr_c:.2%}", r.category]
                   for r in report.rating)
     story.append(_table(rating))
 
