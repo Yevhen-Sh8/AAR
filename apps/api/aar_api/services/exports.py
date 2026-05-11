@@ -7,6 +7,7 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from aar_api.schemas.monthly import MonthlyReport
 from aar_api.schemas.reports import DailyReport
 
 
@@ -130,6 +131,116 @@ def daily_report_to_pdf(report: DailyReport) -> bytes:
 
     _break_table("Т.2.1. Розподіл втрат", report.loss_breakdown)
     _break_table("Т.3.1. Розподіл повернень", report.repair_breakdown)
+
+    doc.build(story)
+    return buf.getvalue()
+
+
+def monthly_report_to_xlsx(report: MonthlyReport) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = f"{report.year}-{report.month:02d}"
+    bold = Font(bold=True)
+
+    ws.append([f"Звіт за {report.year}-{report.month:02d}"])
+    ws["A1"].font = bold
+    ws.append([])
+    ws.append(["Т.4. Інтегральні показники по експлуатантах"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    ws.append([
+        "Експлуатант", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх",
+        "Кеф", "Кеф_обсл", "Кв_обсл", "Δ Кеф (в.п.)",
+    ])
+    for c in ws[ws.max_row]:
+        c.font = bold
+    for r in report.rows:
+        ws.append([
+            r.operator_code, r.item_type_code, r.launched, r.lost, r.repaired,
+            r.success, r.keff, r.keff_obsl, r.kv_obsl, r.delta_keff_pp,
+        ])
+    t = report.totals
+    ws.append([
+        t.operator_code, t.item_type_code, t.launched, t.lost, t.repaired,
+        t.success, t.keff, t.keff_obsl, t.kv_obsl, t.delta_keff_pp,
+    ])
+    for c in ws[ws.max_row]:
+        c.font = bold
+
+    ws.append([])
+    ws.append(["Рейтинг експлуатантів за Кеф_обсл"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    ws.append(["Місце", "Експлуатант", "Кеф_обсл", "Категорія"])
+    for c in ws[ws.max_row]:
+        c.font = bold
+    for rt in report.rating:
+        ws.append([rt.rank, rt.operator_code, rt.keff_obsl, rt.category])
+
+    ws.append([])
+    ws.append(["Т.7. Зони відповідальності"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    ws.append(["Зона", "Втрати", "Ремонти", "Разом", "Частка від запущених"])
+    for c in ws[ws.max_row]:
+        c.font = bold
+    for z in report.zones:
+        ws.append([z.zone.value, z.losses, z.repairs, z.total, z.share_of_launched])
+
+    ws.append([])
+    ws.append(["Т.6. Динаміка vs попередній місяць"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    ws.append(["Експлуатант", "Кеф попер.", "Кеф поточ.", "Тренд"])
+    for c in ws[ws.max_row]:
+        c.font = bold
+    for tr in report.trends:
+        ws.append([
+            tr.operator_code,
+            tr.keff_prev_month if tr.keff_prev_month is not None else "-",
+            tr.keff_this_month, tr.trend,
+        ])
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def monthly_report_to_pdf(report: MonthlyReport) -> bytes:
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), title="Monthly AAR report")
+    styles = getSampleStyleSheet()
+    story: list = [
+        Paragraph(f"Звіт за {report.year}-{report.month:02d}", styles["Title"]),
+        Spacer(1, 12),
+        Paragraph("Т.4. Інтегральні показники", styles["Heading2"]),
+    ]
+    integral: list[list[object]] = [[
+        "Експл.", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх",
+        "Кеф", "Кеф_обсл", "Кв_обсл", "Δ Кеф",
+    ]]
+    for r in report.rows:
+        integral.append([
+            r.operator_code, r.item_type_code, r.launched, r.lost, r.repaired,
+            r.success, f"{r.keff:.2%}", f"{r.keff_obsl:.2%}",
+            f"{r.kv_obsl:.2%}", f"{r.delta_keff_pp:+.1f}",
+        ])
+    t = report.totals
+    integral.append([
+        t.operator_code, t.item_type_code, t.launched, t.lost, t.repaired,
+        t.success, f"{t.keff:.2%}", f"{t.keff_obsl:.2%}",
+        f"{t.kv_obsl:.2%}", f"{t.delta_keff_pp:+.1f}",
+    ])
+    story.append(_table(integral))
+
+    story.extend([Spacer(1, 12), Paragraph("Рейтинг експлуатантів", styles["Heading2"])])
+    rating: list[list[object]] = [["Місце", "Експлуатант", "Кеф_обсл", "Категорія"]]
+    rating.extend([r.rank, r.operator_code, f"{r.keff_obsl:.2%}", r.category]
+                  for r in report.rating)
+    story.append(_table(rating))
+
+    story.extend([Spacer(1, 12), Paragraph("Т.7. Зони відповідальності", styles["Heading2"])])
+    zones: list[list[object]] = [["Зона", "Втрати", "Ремонти", "Разом", "Частка"]]
+    zones.extend([z.zone.value, z.losses, z.repairs, z.total, f"{z.share_of_launched:.2%}"]
+                 for z in report.zones)
+    story.append(_table(zones))
 
     doc.build(story)
     return buf.getvalue()

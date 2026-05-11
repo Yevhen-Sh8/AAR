@@ -4,6 +4,21 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v0.4.0-monthly-report] — 2026-05-11
+
+### Added (Етап 4 — місячна звітність + рейтинг)
+- `services/monthly.build_monthly_report` агрегує події за вибраний місяць:
+  Т.4 (інтегральні показники по операторах × типах виробів + Кеф / Кеф_обсл /
+  Кв_обсл / Δ Кеф у в.п.), рейтинг експлуатантів за Кеф_обсл (категорії
+  high/ok/needs_training, пороги 0.85 / 0.70), Т.7 (зони відповідальності
+  — операторська / зовнішня / виробнича / unknown), Т.6 (тренди up/down/flat
+  vs попередній місяць).
+- Розширено `services/exports` функціями `monthly_report_to_xlsx/pdf`.
+- REST: `GET /reports/monthly?year=...&month=...` (JSON / XLSX / PDF).
+- CLI `python -m aar_api.scripts.monthly_report --year YYYY --month MM --out DIR`.
+- Тести: точність розрахунку Кеф_обсл (6/7 при 1 зовнішній втраті),
+  Δ Кеф (+25 в.п. між листопадом і груднем), тренд up, rank=1 для топ-1.
+
 ## [v0.3.0-daily-report] — 2026-05-11
 
 ### Added (Етап 3 — щоденна довідка)
