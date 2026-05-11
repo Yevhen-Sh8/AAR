@@ -4,6 +4,29 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v0.5.0-aar-cases] — 2026-05-11
+
+### Added (Етап 5 — AAR-кейси + тригери)
+- `services/triggers`: engine із чотирма авто-тригерами T1–T4 (T5 = ручний):
+  - **T1** Кеф_обсл оператора < 0.70 три доби поспіль → `keff_drop`.
+  - **T2** Та сама причина (loss/repair) ≥ 3 разів за 7 діб → `repeated_reason`.
+  - **T3** Серійний № отримав ≥ 2 ремонтів/втрат за 30 діб → `item_anomaly`.
+  - **T4** Кеф підприємства впав > 10 в.п. day-over-day → `enterprise_drop`.
+- Ідемпотентність: signature `[T#:key:date]` у заголовку кейсу, повторні
+  запуски тригерів не дублюють кейси, а збільшують `skipped_existing`.
+- REST `/aar/*`:
+  - `POST /aar/cases` (ручний T5), `GET /aar/cases?status=&trigger=`,
+    `GET /aar/cases/{id}`, `POST /aar/cases/{id}/close`.
+  - `POST /aar/cases/{id}/reports` — індивідуальний звіт (6 блоків v1.0:
+    что_сталося / що_спрацювало / що_ні / чому / зовнішні / що_змінити).
+  - `POST /aar/cases/{id}/recommendations`,
+    `PATCH /aar/recommendations/{id}` (proposed → in_progress → done →
+    validated, з авто-`validated_at`).
+  - `POST /aar/run-triggers?today=YYYY-MM-DD` — ручне ініціювання engine.
+- CLI `python -m aar_api.scripts.run_triggers --date YYYY-MM-DD` для cron.
+- Тести: T1 (3 дні × 5 пусків з Кеф_обсл=0.4), T3 (2 ремонти одного № за
+  вікно), повний flow ручного кейсу (звіт → рекомендація → validate → close).
+
 ## [v0.4.0-monthly-report] — 2026-05-11
 
 ### Added (Етап 4 — місячна звітність + рейтинг)
