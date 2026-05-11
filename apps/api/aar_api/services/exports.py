@@ -1,0 +1,135 @@
+from io import BytesIO
+
+from openpyxl import Workbook
+from openpyxl.styles import Font
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from aar_api.schemas.reports import DailyReport
+
+
+def daily_report_to_xlsx(report: DailyReport) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = f"Доба {report.report_date.isoformat()}"
+    bold = Font(bold=True)
+
+    ws.append([f"Аналітична довідка за {report.report_date.isoformat()}"])
+    ws["A1"].font = bold
+    ws.append([])
+    ws.append(["Т.1. Зведені показники"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    headers = ["Експлуатант", "Тип", "Запущено", "Втрачено", "Ремонт", "Успіх", "Кеф"]
+    ws.append(headers)
+    for c in ws[ws.max_row]:
+        c.font = bold
+    for r in report.rows:
+        ws.append([r.operator_code, r.item_type_code, r.launched, r.lost,
+                   r.repaired, r.success, r.keff])
+    t = report.totals
+    ws.append([t.operator_code, t.item_type_code, t.launched, t.lost,
+               t.repaired, t.success, t.keff])
+    for c in ws[ws.max_row]:
+        c.font = bold
+
+    ws.append([])
+    ws.append(["Т.2. Безповоротні втрати — деталізація"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    ws.append(["Експлуатант", "Тип", "Серійний №", "Причина", "Примітка"])
+    for c in ws[ws.max_row]:
+        c.font = bold
+    for d in report.loss_details:
+        ws.append([d.operator_code, d.item_type_code, d.serial_no, d.reason_code, d.notes or ""])
+
+    ws.append([])
+    ws.append(["Т.2.1. Розподіл втрат за причинами"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    ws.append(["Тип", "Причина", "Зона", "Кількість"])
+    for c in ws[ws.max_row]:
+        c.font = bold
+    for b in report.loss_breakdown:
+        ws.append([b.item_type_code, b.reason_code, b.zone.value, b.count])
+
+    ws.append([])
+    ws.append(["Т.3. Повернення в ремонт — деталізація"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    ws.append(["Експлуатант", "Тип", "Серійний №", "Причина", "Примітка"])
+    for c in ws[ws.max_row]:
+        c.font = bold
+    for rd in report.repair_details:
+        ws.append(
+            [rd.operator_code, rd.item_type_code, rd.serial_no, rd.reason_code, rd.notes or ""]
+        )
+
+    ws.append([])
+    ws.append(["Т.3.1. Розподіл повернень за причинами"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    ws.append(["Тип", "Причина", "Зона", "Кількість"])
+    for c in ws[ws.max_row]:
+        c.font = bold
+    for rb in report.repair_breakdown:
+        ws.append([rb.item_type_code, rb.reason_code, rb.zone.value, rb.count])
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _table(data: list[list[object]]) -> Table:
+    tbl = Table(data, repeatRows=1)
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a3a1a")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+            ]
+        )
+    )
+    return tbl
+
+
+def daily_report_to_pdf(report: DailyReport) -> bytes:
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), title="Daily AAR report")
+    styles = getSampleStyleSheet()
+    story: list = [
+        Paragraph(f"Аналітична довідка за {report.report_date.isoformat()}", styles["Title"]),
+        Spacer(1, 12),
+        Paragraph("Т.1. Зведені показники", styles["Heading2"]),
+    ]
+    summary: list[list[object]] = [
+        ["Експлуатант", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх", "Кеф"]
+    ]
+    for r in report.rows:
+        summary.append(
+            [r.operator_code, r.item_type_code, r.launched, r.lost,
+             r.repaired, r.success, f"{r.keff:.2%}"]
+        )
+    t = report.totals
+    summary.append(
+        [t.operator_code, t.item_type_code, t.launched, t.lost,
+         t.repaired, t.success, f"{t.keff:.2%}"]
+    )
+    story.append(_table(summary))
+
+    def _break_table(title: str, items: list) -> None:
+        if not items:
+            return
+        story.extend([Spacer(1, 12), Paragraph(title, styles["Heading2"])])
+        rows: list[list[object]] = [["Тип", "Причина", "Зона", "Кількість"]]
+        rows.extend(
+            [b.item_type_code, b.reason_code, b.zone.value, b.count] for b in items
+        )
+        story.append(_table(rows))
+
+    _break_table("Т.2.1. Розподіл втрат", report.loss_breakdown)
+    _break_table("Т.3.1. Розподіл повернень", report.repair_breakdown)
+
+    doc.build(story)
+    return buf.getvalue()

@@ -4,6 +4,23 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v0.3.0-daily-report] — 2026-05-11
+
+### Added (Етап 3 — щоденна довідка)
+- `services/reports.py`: агрегація подій по добі → `DailyReport` (Т.1
+  зведення по парах експлуатант×тип, Т.2/Т.2.1 безповоротні втрати + розподіл
+  за причинами, Т.3/Т.3.1 повернення в ремонт + розподіл, Кеф = success/launched).
+- `services/exports.py`: XLSX (openpyxl) і PDF landscape A4 (reportlab).
+- REST: `GET /reports/daily?date=YYYY-MM-DD` (JSON), `/daily.xlsx`, `/daily.pdf`.
+- CLI `python -m aar_api.scripts.daily_report --date YYYY-MM-DD --out DIR`
+  (за замовчанням — вчора, тека `./out`); для cron 23:59 на хост-системі.
+- Тести: точна агрегація на синтетичному наборі (5/2 пусків E-01/E-02) + smoke
+  на бінарні підписи XLSX/PDF.
+
+### Changed
+- `tests/conftest.py`: винесено autouse-фікстуру схеми БД, щоб усі тестові
+  модулі бачили створені таблиці.
+
 ## [v0.2.0-data-model] — 2026-05-11
 
 ### Added (Етап 2 — модель даних і довідники)

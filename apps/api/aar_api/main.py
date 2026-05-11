@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from aar_api import __version__
 from aar_api.core.config import get_settings
-from aar_api.routers import dictionaries, events, health
+from aar_api.routers import dictionaries, events, health, reports
 
 settings = get_settings()
 
@@ -24,3 +24,4 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(dictionaries.router)
 app.include_router(events.router)
+app.include_router(reports.router)

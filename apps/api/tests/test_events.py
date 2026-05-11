@@ -1,25 +1,14 @@
 from datetime import date
 
-import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from aar_api.core.db import Base, _engine
+from aar_api.core.db import _engine
 from aar_api.main import app
 from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairReason, Zone
 
 
-@pytest.fixture(autouse=True)
-async def _db_schema():
-    async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
 async def _seed_minimal() -> None:
-    from sqlalchemy.ext.asyncio import async_sessionmaker
-
     Session = async_sessionmaker(_engine, expire_on_commit=False)
     async with Session() as s:
         s.add_all(
