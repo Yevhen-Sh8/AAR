@@ -23,6 +23,9 @@ class Item(Base):
 class UsageEvent(Base):
     __tablename__ = "usage_events"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    client_event_id: Mapped[str | None] = mapped_column(
+        String(64), unique=True, index=True, nullable=True
+    )
     item_id: Mapped[int] = mapped_column(ForeignKey("items.id"), index=True)
     operator_id: Mapped[int] = mapped_column(ForeignKey("operators.id"), index=True)
     event_date: Mapped[date] = mapped_column(Date, index=True)

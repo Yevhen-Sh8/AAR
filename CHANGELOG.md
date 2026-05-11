@@ -4,6 +4,30 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v0.8.0-offline-pwa] — 2026-05-11
+
+### Added (Етап 7 — offline-first PWA)
+- **Серверна ідемпотентність**: поле `UsageEvent.client_event_id` (UUID,
+  unique index) + міграція `0003_offline_idempotency`. `POST /events` із
+  існуючим `client_event_id` повертає raніше створену подію без дублю.
+- **IndexedDB-черга** (`apps/web/src/lib/db.ts`) через `idb`:
+  store `event_queue`, key=`client_event_id`, індекс `by_status`.
+- **Sync-логіка** (`apps/web/src/lib/sync.ts`):
+  - `submitEvent()`: завжди enqueue → якщо online, відразу POST.
+  - `flushQueue()`: відправляє всі `pending` події по черзі.
+  - `installAutoSync()`: підписується на `online` event, авто-flush.
+  - Кожна подія несе `client_event_id` — повторні спроби не створюють
+    дублів на сервері.
+- **UI**: нова сторінка `/event-form` з індикатором online/offline,
+  списком черги, кнопкою «Синхронізувати зараз».
+- **Тести** (vitest + `fake-indexeddb`):
+  - 10 подій додано офлайн → 0 викликів `fetch`.
+  - Online → flush: 10 викликів `fetch`, 10 `synced`; повторний flush — 0.
+
+### Acceptance
+Контрольна точка з roadmap Етапу 7 виконана: 10 подій офлайн → синхрон
+без втрат і дублів.
+
 ## [v0.7.0-llm] — 2026-05-11
 
 ### Added (Етап 6 — LLM-автоматизація через Claude API)

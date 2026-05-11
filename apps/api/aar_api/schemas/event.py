@@ -14,6 +14,7 @@ class UsageEventIn(BaseModel):
     loss_reason_code: str | None = None
     repair_reason_code: str | None = None
     notes: str | None = None
+    client_event_id: str | None = None
 
     @model_validator(mode="after")
     def _check_reason(self) -> "UsageEventIn":
@@ -31,6 +32,7 @@ class UsageEventIn(BaseModel):
 class UsageEventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
+    client_event_id: str | None
     item_id: int
     operator_id: int
     event_date: date

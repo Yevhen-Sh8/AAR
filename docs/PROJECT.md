@@ -31,10 +31,10 @@
 ## 3. Поточний статус
 
 - **Версія концепції**: v2.0
-- **Поточний етап**: Етап 6 — LLM-автоматизація через Claude API.
+- **Поточний етап**: Етап 7 — offline-first PWA.
 - **Гілка розробки**: `claude/equipment-tracking-system-3lB6U`
-- **Найближчі дії**: Етап 7 — offline-first PWA (Workbox, IndexedDB,
-  sync-черга, конфлікт-резолюшн).
+- **Найближчі дії**: Етап 8 — нормативні експорти (шаблони форм наказу № 440:
+  відомості, журнали, акти).
 - **Що вже є**:
   - 11 моделей: `User`, `ItemType`, `Operator`, `LossReason`, `RepairReason`,
     `Item`, `UsageEvent`, `AARCase`, `IndividualReport`, `Recommendation`,

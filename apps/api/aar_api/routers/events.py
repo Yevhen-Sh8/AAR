@@ -35,6 +35,15 @@ async def _get_or_create_item(
 async def create_event(
     payload: UsageEventIn, session: AsyncSession = Depends(get_session)
 ) -> UsageEvent:
+    if payload.client_event_id:
+        existing = await session.scalar(
+            select(UsageEvent).where(
+                UsageEvent.client_event_id == payload.client_event_id
+            )
+        )
+        if existing is not None:
+            return existing
+
     item_type_id = await _resolve_code(session, ItemType, payload.item_type_code)
     operator_id = await _resolve_code(session, Operator, payload.operator_code)
     item = await _get_or_create_item(session, payload.item_serial_no, item_type_id)
@@ -51,6 +60,7 @@ async def create_event(
     )
 
     event = UsageEvent(
+        client_event_id=payload.client_event_id,
         item_id=item.id,
         operator_id=operator_id,
         event_date=payload.event_date,

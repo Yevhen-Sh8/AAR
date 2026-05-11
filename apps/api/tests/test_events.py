@@ -59,3 +59,25 @@ async def test_event_validation_requires_reason() -> None:
         assert r.status_code == 422
 
 
+
+
+async def test_event_idempotent_via_client_event_id() -> None:
+    await _seed_minimal()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        body = {
+            "item_serial_no": "A-00099",
+            "item_type_code": "A",
+            "operator_code": "E-01",
+            "event_date": str(date(2025, 11, 5)),
+            "outcome": "success",
+            "client_event_id": "uuid-fixed-1",
+        }
+        r1 = await client.post("/events", json=body)
+        assert r1.status_code == 201, r1.text
+        first_id = r1.json()["id"]
+        r2 = await client.post("/events", json=body)
+        assert r2.status_code in (200, 201)
+        assert r2.json()["id"] == first_id
+        listing = (await client.get("/events")).json()
+        assert sum(1 for e in listing if e["client_event_id"] == "uuid-fixed-1") == 1
