@@ -4,6 +4,28 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v0.2.0-data-model] — 2026-05-11
+
+### Added (Етап 2 — модель даних і довідники)
+- Моделі: `ItemType`, `Operator`, `LossReason`, `RepairReason` із зоною
+  відповідальності (`operator/manufacturer/external/unknown`), `Item`
+  (пономерний), `UsageEvent` (з `outcome ∈ {success, lost, repair}`),
+  `AARCase`, `IndividualReport`, `Recommendation`, `KnowledgeEntry`.
+- Alembic-міграція `0002_data_model`.
+- Pydantic-схеми + REST: `GET /dictionaries/*`, `POST /events`,
+  `GET /events?date_from&date_to&operator_code&outcome`.
+- Валідація події: `outcome=lost` ⇒ обовʼязковий `loss_reason_code`,
+  `outcome=repair` ⇒ `repair_reason_code`, `success` не може нести причину.
+- Seed-скрипт `python -m aar_api.scripts.seed` створює довідники
+  (А/Б, Е-01…Е-10, a–e, a–r) і ~3000 синтетичних подій листопад–грудень
+  з фіксованим seed=42.
+- Тести `tests/test_events.py` (in-memory SQLite через aiosqlite).
+
+### Fixed
+- `ruff` config: додано `flake8-bugbear.extend-immutable-calls` для
+  `fastapi.Depends/Query/Path/Body/Header`; `extend-per-file-ignores` для
+  alembic-міграцій.
+
 ## [v0.1.0-skeleton] — 2026-05-11
 
 ### Added (Етап 1 — скелет монорепо)

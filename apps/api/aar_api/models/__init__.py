@@ -1,3 +1,32 @@
-from aar_api.models.user import User
+from aar_api.models.aar import (
+    AARCase,
+    CaseStatus,
+    IndividualReport,
+    KnowledgeEntry,
+    Recommendation,
+    RecommendationStatus,
+    TriggerType,
+)
+from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairReason, Zone
+from aar_api.models.event import Item, Outcome, UsageEvent
+from aar_api.models.user import Role, User
 
-__all__ = ["User"]
+__all__ = [
+    "AARCase",
+    "CaseStatus",
+    "IndividualReport",
+    "Item",
+    "ItemType",
+    "KnowledgeEntry",
+    "LossReason",
+    "Operator",
+    "Outcome",
+    "Recommendation",
+    "RecommendationStatus",
+    "RepairReason",
+    "Role",
+    "TriggerType",
+    "UsageEvent",
+    "User",
+    "Zone",
+]

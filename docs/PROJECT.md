@@ -30,13 +30,20 @@
 ## 3. Поточний статус
 
 - **Версія концепції**: v2.0
-- **Поточний етап**: Етап 1 — скелет монорепо.
+- **Поточний етап**: Етап 2 — модель даних і довідники.
 - **Гілка розробки**: `claude/equipment-tracking-system-3lB6U`
-- **Найближчі дії**: Етап 2 — модель даних і довідники (`Item`, `ItemType`,
-  `Operator`, `LossReason`, `RepairReason`, `UsageEvent`, `AARCase`).
-- **Що вже є**: FastAPI з `/health` + JWT-утиліти, React+Vite PWA скелет
-  (3 сторінки), Alembic з першою міграцією (users), docker-compose,
-  GitHub Actions CI, спільний `packages/shared/classifiers.json`.
+- **Найближчі дії**: Етап 3 — щоденна довідка (SQL view Кеф, генератор PDF/XLSX,
+  cron 23:59).
+- **Що вже є**:
+  - 11 моделей: `User`, `ItemType`, `Operator`, `LossReason`, `RepairReason`,
+    `Item`, `UsageEvent`, `AARCase`, `IndividualReport`, `Recommendation`,
+    `KnowledgeEntry`.
+  - Дві Alembic-міграції: `0001_initial` (users), `0002_data_model` (решта).
+  - REST API: `GET /dictionaries/{item-types,operators,loss-reasons,repair-reasons}`,
+    `POST /events`, `GET /events` із фільтрами по даті/експлуатанту/результату.
+  - Seed-скрипт `python -m aar_api.scripts.seed` генерує синтетику листопад–грудень
+    (10 експлуатантів × ~60 діб × 2–8 пусків/добу ≈ 3000 подій).
+  - PWA + Dockerfile-и + docker-compose; CI зелений (ruff/mypy/pytest/build).
 
 ## 4. Стек і середовище (узгоджено)
 
