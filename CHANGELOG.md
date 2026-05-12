@@ -4,6 +4,32 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v0.9.0-mod440-exports] — 2026-05-11
+
+### Added (Етап 8 — нормативні експорти за наказом № 440)
+- Залежність `python-docx>=1.1`.
+- `services/mod440.py` — 4 форми:
+  - **Узагальнююча відомість обліку** (Додаток 1 до п. 7 розділу II) —
+    XLSX-знімок інвентаря по типах із залишком / надходженням / спожитим
+    (success) / втратами / у ремонті.
+  - **Журнал руху військового майна** — XLSX-лог подій за період
+    із серійним №, типом, експлуатантом, результатом, кодом причини,
+    підставою.
+  - **Акт списання виробу** (безповоротна втрата) — DOCX за подією
+    типу `lost`, поля: ЗАТВЕРДЖУЮ, №/дата, обставини, мат. відп. особа,
+    члени комісії.
+  - **Акт повернення в ремонт** — DOCX за подією типу `repair`, поля:
+    №/дата, опис дефекту, здав / прийняв.
+- REST `/exports/mod440/*`:
+  - `GET /inventory.xlsx?unit_name&as_of`
+  - `GET /movement.xlsx?date_from&date_to&unit_name`
+  - `GET /loss-act/{event_id}.docx?unit_name&act_no&responsible_person&circumstances`
+  - `GET /repair-act/{event_id}.docx?unit_name&act_no&sender&receiver&defect_description`
+- Валідації типу події: акт списання вимагає `outcome=lost`, акт ремонту —
+  `outcome=repair`; за невідповідності — `400`.
+- Тести: бінарні підписи XLSX/DOCX (zip-magic `PK`), `Content-Disposition`,
+  400 на спробі сформувати акт списання для успішної події.
+
 ## [v0.8.0-offline-pwa] — 2026-05-11
 
 ### Added (Етап 7 — offline-first PWA)
