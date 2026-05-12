@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, Date, DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aar_api.core.db import Base
@@ -37,6 +37,7 @@ class UsageEvent(Base):
         ForeignKey("repair_reasons.id"), nullable=True
     )
     notes: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    location: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

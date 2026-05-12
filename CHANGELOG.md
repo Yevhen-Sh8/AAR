@@ -4,6 +4,40 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v0.10.0-integrations] — 2026-05-11
+
+### Added (Етап 9 — універсальний інтеграційний шар)
+- **Дворівнева архітектура**: один загальний REST/JSON-контракт +
+  тонкі shape-адаптери на кожну цільову систему. Геопросторові дані
+  передаються як **GeoJSON Point** (RFC 7946), щоб без перетворень
+  споживались мапними клієнтами.
+- **Підтримувані konnektor-kinds** (per policy, Оберіг **виключено** як
+  таємну систему):
+  - `generic` — pass-through `{event, data}`
+  - `odin` — C2-envelope (`event_type / timestamp / actor / subject / outcome / geo`)
+  - `delta` — GeoJSON FeatureCollection
+  - `kropyva` — окремий GeoJSON Feature
+  - `sap` — flat one-level PascalCase запис
+- **Поле `location`** (GeoJSON Point) у `UsageEvent` + міграція
+  `0004_integrations`.
+- **Outbound webhooks**: `Subscription` (name, kind, target_url, secret,
+  events[], headers, active) + аудит `Delivery` (status / response_code /
+  attempts / error). HMAC-SHA256 підпис у `X-AAR-Signature`.
+- **REST `/integrations/*`**:
+  - `POST/GET/DELETE /subscriptions`, `GET /deliveries`
+  - `GET /connectors` (явно перелічує `excluded: ["oberig"]`)
+  - `POST /preview?kind=&event_id=` — попередній перегляд payload без
+    реального POST
+  - `POST /dispatch/{event_id}` — ручний fan-out з аудитом
+  - `POST /inbound/events` — універсальний прийом нормалізованої події
+    з будь-якої системи; ідемпотентний по `(source, external_id)`
+  - `GET /events.geojson?date_from=&date_to=` — експорт у GeoJSON
+    FeatureCollection для DELTA / Кропиви
+- **Тести** (7): CRUD підписок, рендер payload (delta=GeoJSON, sap=flat),
+  dispatch з мокнутим `_post` (HMAC-підпис коректний, response_code=202),
+  inbound + ідемпотентність, GeoJSON-експорт, connectors виключає
+  Оберіг.
+
 ## [v0.9.0-mod440-exports] — 2026-05-11
 
 ### Added (Етап 8 — нормативні експорти за наказом № 440)

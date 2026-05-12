@@ -9,11 +9,21 @@ from aar_api.models.aar import (
 )
 from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairReason, Zone
 from aar_api.models.event import Item, Outcome, UsageEvent
+from aar_api.models.integration import (
+    ConnectorKind,
+    Delivery,
+    DeliveryStatus,
+    Subscription,
+    WebhookEventKind,
+)
 from aar_api.models.user import Role, User
 
 __all__ = [
     "AARCase",
     "CaseStatus",
+    "ConnectorKind",
+    "Delivery",
+    "DeliveryStatus",
     "IndividualReport",
     "Item",
     "ItemType",
@@ -25,8 +35,10 @@ __all__ = [
     "RecommendationStatus",
     "RepairReason",
     "Role",
+    "Subscription",
     "TriggerType",
     "UsageEvent",
     "User",
+    "WebhookEventKind",
     "Zone",
 ]
