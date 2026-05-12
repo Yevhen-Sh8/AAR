@@ -1,0 +1,67 @@
+from datetime import datetime
+from typing import Any
+
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from aar_api.core.db import get_session
+from aar_api.core.rbac import require_role
+from aar_api.models.audit import AuditAction, AuditLog
+from aar_api.models.user import Role
+from aar_api.services.audit import verify_chain
+
+router = APIRouter(prefix="/audit", tags=["audit"])
+
+
+class AuditEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    action: AuditAction
+    actor: str | None
+    entity_type: str
+    entity_id: str
+    payload: dict[str, Any]
+    prev_hash: str
+    entry_hash: str
+    created_at: datetime
+
+
+class ChainStatusOut(BaseModel):
+    ok: bool
+    checked: int
+    broken_at_id: int | None
+    message: str
+
+
+@router.get(
+    "/log",
+    response_model=list[AuditEntryOut],
+    dependencies=[Depends(require_role(Role.ADMIN, Role.MANAGER, Role.ANALYST))],
+)
+async def list_audit(
+    action: AuditAction | None = Query(default=None),
+    limit: int = Query(default=100, le=1000),
+    session: AsyncSession = Depends(get_session),
+) -> list[AuditLog]:
+    stmt = select(AuditLog).order_by(AuditLog.id.desc()).limit(limit)
+    if action:
+        stmt = stmt.where(AuditLog.action == action)
+    rows = await session.scalars(stmt)
+    return list(rows)
+
+
+@router.get(
+    "/verify",
+    response_model=ChainStatusOut,
+    dependencies=[Depends(require_role(Role.ADMIN, Role.MANAGER))],
+)
+async def verify(session: AsyncSession = Depends(get_session)) -> ChainStatusOut:
+    status = await verify_chain(session)
+    return ChainStatusOut(
+        ok=status.ok,
+        checked=status.checked,
+        broken_at_id=status.broken_at_id,
+        message=status.message,
+    )

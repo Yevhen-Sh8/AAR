@@ -6,9 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.db import get_session
+from aar_api.models.audit import AuditAction
 from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairReason
 from aar_api.models.event import Item, Outcome, UsageEvent
 from aar_api.schemas.event import UsageEventIn, UsageEventOut
+from aar_api.services.audit import append as audit_append
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -70,6 +72,18 @@ async def create_event(
         notes=payload.notes,
     )
     session.add(event)
+    await session.flush()
+    await audit_append(
+        session,
+        action=AuditAction.EVENT_CREATED,
+        entity_type="usage_event",
+        entity_id=event.id,
+        payload={
+            "outcome": payload.outcome.value,
+            "operator_code": payload.operator_code,
+            "item_serial_no": payload.item_serial_no,
+        },
+    )
     await session.commit()
     await session.refresh(event)
     return event

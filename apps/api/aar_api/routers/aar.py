@@ -13,6 +13,7 @@ from aar_api.models.aar import (
     RecommendationStatus,
     TriggerType,
 )
+from aar_api.models.audit import AuditAction
 from aar_api.models.dictionaries import Operator
 from aar_api.schemas.aar import (
     AARCaseIn,
@@ -24,6 +25,7 @@ from aar_api.schemas.aar import (
     RecommendationStatusUpdate,
     TriggerResult,
 )
+from aar_api.services.audit import append as audit_append
 from aar_api.services.triggers import TriggerConfig, evaluate_triggers
 
 router = APIRouter(prefix="/aar", tags=["aar"])
@@ -53,6 +55,14 @@ async def create_case(
         trigger=TriggerType.MANUAL,
     )
     session.add(case)
+    await session.flush()
+    await audit_append(
+        session,
+        action=AuditAction.CASE_CREATED,
+        entity_type="aar_case",
+        entity_id=case.id,
+        payload={"title": case.title, "trigger": case.trigger.value},
+    )
     await session.commit()
     await session.refresh(case)
     return case
@@ -83,6 +93,13 @@ async def close_case(case_id: int, session: AsyncSession = Depends(get_session))
     case = await _get_case(session, case_id)
     case.status = CaseStatus.CLOSED
     case.closed_at = datetime.now(UTC)
+    await audit_append(
+        session,
+        action=AuditAction.CASE_CLOSED,
+        entity_type="aar_case",
+        entity_id=case.id,
+        payload={"title": case.title},
+    )
     await session.commit()
     await session.refresh(case)
     return case

@@ -4,6 +4,42 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v1.0.0-pilot-ready] — 2026-05-11
+
+### Added (Етап 10 — безпека, аудит, готовність до пілоту)
+- **Append-only audit log з SHA-256 hash-chain** (A12):
+  - Таблиця `audit_log` + міграція `0005_audit_log`.
+  - `services/audit.append()` обчислює `entry_hash` = `SHA-256(canonical_json(
+    action, actor, entity_type, entity_id, payload, prev_hash))`. Genesis
+    = 64 нулі.
+  - `services/audit.verify_chain()` повертає `(ok, checked, broken_at_id,
+    message)` — будь-яка модифікація історичного рядка ламає ланцюг і
+    показує id першого розбіжного запису.
+  - Підключено до `POST /events` (`event.created`) та
+    `POST /aar/cases` + `/aar/cases/{id}/close` (`case.created`/`case.closed`).
+- **RBAC** через JWT bearer (`core/rbac.require_role(*roles)`):
+  - У `development` — permissive (для тестів і локальної розробки).
+  - Поза dev — потребує bearer-токен; `role`-claim повинен бути в
+    дозволеному списку. 401 без токена, 403 при невідповідній ролі.
+- **REST `/audit/*`**:
+  - `GET /audit/log?action=&limit=` — захищений `Role.ADMIN/MANAGER/ANALYST`.
+  - `GET /audit/verify` — захищений `Role.ADMIN/MANAGER`,
+    повертає статус ланцюга.
+- **Тести** (4): chain extends and verifies, tampering breaks chain
+  (`entry_hash mismatch at id=1`), `/events` пише `event.created` у
+  audit-log, `/audit/log` повертає 401 при `production`-environment
+  без токена.
+- **`docs/normative/iso-27001-controls.md`** — мапа Annex A контролів
+  на код (A.5.15/5.18, A.8.3/5/15/16/24/32) + інфраструктурні
+  контролі для пілоту (A.5.30, A.8.13/20/21/24/28).
+
+### Acceptance — Roadmap §Етап 10
+- ✓ Hash-chain цілісність валідується тестом.
+- ✓ Маніпуляція рядком детектується.
+- ✓ RBAC блокує неавтентифікований доступ у production.
+- pending: розгортання `docker compose up` у замовника, restore-drill,
+  звірка реквізитів № 440.
+
 ## [v0.10.0-integrations] — 2026-05-11
 
 ### Added (Етап 9 — універсальний інтеграційний шар)

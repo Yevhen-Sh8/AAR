@@ -26,15 +26,16 @@
 | Наказ № 440 у деталях | [`docs/normative/mod-440.md`](normative/mod-440.md) |
 | NATO LL ↔ AAR | [`docs/normative/nato-ll.md`](normative/nato-ll.md) |
 | Що ще не покрито | [`docs/normative/gap-analysis.md`](normative/gap-analysis.md) |
+| ISO/IEC 27001 контролі | [`docs/normative/iso-27001-controls.md`](normative/iso-27001-controls.md) |
 | Історія змін | [`CHANGELOG.md`](../CHANGELOG.md) |
 
 ## 3. Поточний статус
 
 - **Версія концепції**: v2.0
-- **Поточний етап**: Етап 9 — універсальний інтеграційний шар.
+- **Поточний етап**: Етап 10 — безпека, аудит, готовність до пілоту. ✓
 - **Гілка розробки**: `claude/equipment-tracking-system-3lB6U`
-- **Найближчі дії**: Етап 10 — безпека (append-only лог + hash-chain,
-  RBAC, відповідність ISO/IEC 27001:2022), пілот.
+- **Найближчі дії**: пілотне розгортання у замовника, restore-drill,
+  звірка експортів № 440.
 - **Що вже є**:
   - 11 моделей: `User`, `ItemType`, `Operator`, `LossReason`, `RepairReason`,
     `Item`, `UsageEvent`, `AARCase`, `IndividualReport`, `Recommendation`,
