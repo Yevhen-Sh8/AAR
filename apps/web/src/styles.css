@@ -1,0 +1,35 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #0a1a0a;
+  color: #e8e8d0;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+header h1 {
+  color: #d4b04a;
+  margin: 0 0 0.5rem;
+}
+
+nav a {
+  color: #b0c8b0;
+  margin-right: 1rem;
+  text-decoration: none;
+}
+
+nav a:hover {
+  color: #d4b04a;
+}
+
+main {
+  margin-top: 2rem;
+}

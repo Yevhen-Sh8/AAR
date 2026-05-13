@@ -1,0 +1,1 @@
+{"root":["./src/App.test.tsx","./src/App.tsx","./src/main.tsx","./src/lib/db.ts","./src/lib/sync.test.ts","./src/lib/sync.ts","./src/pages/CasesPage.tsx","./src/pages/Dashboard.tsx","./src/pages/EventForm.tsx","./src/pages/EventsPage.tsx"],"version":"5.9.3"}

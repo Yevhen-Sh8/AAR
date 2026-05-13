@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AAR shared classifiers (placeholder, to be replaced by real codes)",
+  "version": "0.1.0",
+  "item_types": [
+    { "code": "A", "name_uk": "Виріб типу А" },
+    { "code": "B", "name_uk": "Виріб типу Б" }
+  ],
+  "loss_reasons": [
+    { "code": "a", "name_uk": "Причина a", "zone": "external" },
+    { "code": "b", "name_uk": "Причина b", "zone": "external" },
+    { "code": "c", "name_uk": "Причина c", "zone": "operator" },
+    { "code": "d", "name_uk": "Причина d", "zone": "manufacturer" },
+    { "code": "e", "name_uk": "Причина e", "zone": "unknown" }
+  ],
+  "repair_reasons": [
+    { "code": "a", "name_uk": "Причина a", "zone": "operator" },
+    { "code": "b", "name_uk": "Причина b", "zone": "operator" },
+    { "code": "c", "name_uk": "Причина c", "zone": "manufacturer" },
+    { "code": "d", "name_uk": "Причина d", "zone": "manufacturer" },
+    { "code": "e", "name_uk": "Причина e", "zone": "external" },
+    { "code": "f", "name_uk": "Причина f", "zone": "operator" },
+    { "code": "g", "name_uk": "Причина g", "zone": "manufacturer" },
+    { "code": "h", "name_uk": "Причина h", "zone": "external" },
+    { "code": "i", "name_uk": "Причина i", "zone": "operator" },
+    { "code": "j", "name_uk": "Причина j", "zone": "manufacturer" },
+    { "code": "k", "name_uk": "Причина k", "zone": "operator" },
+    { "code": "l", "name_uk": "Причина l", "zone": "external" },
+    { "code": "m", "name_uk": "Причина m", "zone": "operator" },
+    { "code": "n", "name_uk": "Причина n", "zone": "manufacturer" },
+    { "code": "o", "name_uk": "Причина o", "zone": "operator" },
+    { "code": "p", "name_uk": "Причина p", "zone": "external" },
+    { "code": "q", "name_uk": "Причина q", "zone": "operator" },
+    { "code": "r", "name_uk": "Причина r", "zone": "unknown" }
+  ],
+  "responsibility_zones": ["operator", "manufacturer", "external", "unknown"]
+}
