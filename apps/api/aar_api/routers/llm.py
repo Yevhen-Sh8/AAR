@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.db import get_session
-from aar_api.models.aar import AARCase, IndividualReport, KnowledgeEntry
+from aar_api.models.aar import AARCase, IndividualReport
 from aar_api.models.dictionaries import LossReason, Operator, RepairReason
 from aar_api.models.event import UsageEvent
 from aar_api.schemas.llm import (
@@ -16,8 +16,28 @@ from aar_api.schemas.llm import (
     DraftAnalysisResponse,
 )
 from aar_api.services import llm as llm_service
+from aar_api.services.context_assets import (
+    persist_drafts,
+    record_usage,
+    validated_assets,
+)
 
 router = APIRouter(prefix="/llm", tags=["llm"])
+
+
+async def _persist_assets_if_any(
+    session: AsyncSession,
+    result: llm_service.LLMResult,
+    *,
+    source: str,
+    source_agent: str,
+) -> None:
+    if not result.context_assets:
+        return
+    await persist_drafts(
+        session, result.context_assets, source=source, source_agent=source_agent
+    )
+    await session.commit()
 
 
 @router.post("/classify-reason", response_model=ClassifyResponse)
@@ -37,7 +57,10 @@ async def classify_reason(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-    return ClassifyResponse(**result.model_dump())
+    await _persist_assets_if_any(
+        session, result, source=f"classify:{payload.kind}", source_agent="classify_reason"
+    )
+    return ClassifyResponse(**result.task_output.model_dump())
 
 
 @router.post("/cases/{case_id}/draft-analysis", response_model=DraftAnalysisResponse)
@@ -83,7 +106,7 @@ async def draft_case_analysis(
     ]
 
     try:
-        md = llm_service.draft_case_analysis(
+        result = llm_service.draft_case_analysis(
             case_title=case.title,
             trigger=case.trigger.value,
             operator_code=op_code,
@@ -92,7 +115,10 @@ async def draft_case_analysis(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
-    return DraftAnalysisResponse(markdown=md)
+    await _persist_assets_if_any(
+        session, result, source=f"case:{case_id}", source_agent="draft_case_analysis"
+    )
+    return DraftAnalysisResponse(markdown=result.task_output)
 
 
 @router.get("/cases/{case_id}/analogies", response_model=AnalogyResponse)
@@ -101,15 +127,18 @@ async def find_case_analogies(
     top_k: int = 3,
     session: AsyncSession = Depends(get_session),
 ) -> AnalogyResponse:
+    """Search analogies only among VALIDATED context assets (ADR-009)."""
     case = await session.get(AARCase, case_id)
     if case is None:
         raise HTTPException(404, "case not found")
-    rows = list(await session.scalars(select(KnowledgeEntry).limit(50)))
-    knowledge: list[dict[str, str | int]] = [
-        {"id": k.id, "title": k.title, "content": k.content[:500]} for k in rows
-    ]
-    if not knowledge:
+
+    assets = await validated_assets(session, limit=50)
+    if not assets:
         return AnalogyResponse(matches=[])
+
+    knowledge: list[dict[str, str | int]] = [
+        {"id": a.id, "title": a.title, "content": a.description[:500]} for a in assets
+    ]
     query = f"{case.title}\n{case.summary or ''}"
     try:
         result = llm_service.find_analogies(
@@ -117,6 +146,21 @@ async def find_case_analogies(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+    by_id = {a.id: a for a in assets}
+    for m in result.task_output.matches:
+        asset = by_id.get(m.knowledge_id)
+        if asset is not None:
+            await record_usage(
+                session, asset, used_in=f"case:{case_id}", used_by_agent="find_analogies"
+            )
+
+    await _persist_assets_if_any(
+        session, result, source=f"case:{case_id}", source_agent="find_analogies"
+    )
+    if not result.context_assets:
+        await session.commit()
+
     return AnalogyResponse(
-        matches=[AnalogyMatchOut(**m.model_dump()) for m in result.matches]
+        matches=[AnalogyMatchOut(**m.model_dump()) for m in result.task_output.matches]
     )

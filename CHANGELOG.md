@@ -4,6 +4,45 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v1.1.0-context-accumulation] — 2026-05-13
+
+### Added (Етап 11 — Context Accumulation Layer)
+- Реалізація моделі **«Agent → Task Output + Reusable Context Asset»**
+  згідно з [design doc](docs/concept/v1.1-context-accumulation.md).
+- Нові сутності: `ContextAsset` (8 типів) + `AssetUsage` (audit reuse).
+- Міграція `0006_context_assets`.
+- LLM-функції тепер повертають `LLMResult[T] = (task_output, context_assets[])`
+  з PEP 695 generic; промпти просять JSON-масив активів за схемою.
+- Validation lifecycle через сервіс `services/context_assets.py`:
+  `persist_drafts` / `validate_asset` / `reject_asset` / `deprecate_asset`
+  / `validated_assets` / `record_usage`. Кожна транзиція пише
+  специфічну `AuditAction.CONTEXT_ASSET_*` у hash-chain audit.
+- REST `/context/*`: list+filter (`type`, `status`, `source_agent`),
+  get, create (manual draft), validate (M/A/Admin), reject (M/A/Admin),
+  deprecate (M/Admin).
+- `find_analogies` тепер шукає **лише серед validated assets** (ADR-009),
+  записує `AssetUsage` для кожного матча (інкрементує `usage_count`).
+- LLM-роутер автоматично персистить чернетки активів після кожного
+  виклику через `_persist_assets_if_any` helper.
+
+### Tests
+- `tests/test_context.py` (5 нових): manual create starts as draft;
+  full lifecycle (draft→validate→deprecate); reject 409 на не-draft;
+  classify persists drafts; list filters by type/status.
+- Усього 37/37 pytest ✓.
+
+### Quality (after `simplify` review of three agents)
+- 4 справжніх баги виправлено:
+  1. `AuditAction` — додано 4 специфічних значення для context_assets,
+     прибрано зловживання `CASE_CREATED`/`RECOMMENDATION_UPDATED`.
+  2. `owner_role` — типізовано як `Role` enum (замість `String(32)`).
+  3. `find_analogies` — мігровано з legacy `KnowledgeEntry` на
+     `validated_assets()` (ADR-009).
+  4. `record_usage` — підключено у `find_analogies` flow.
+- 2 DRY-helper-и: `_get_asset` у роутері контексту,
+  `_persist_assets_if_any` у роутері LLM.
+- Вузький `ValidationError` замість `except Exception` у `_parse_assets`.
+
 ## [v1.1.0-design] — 2026-05-13
 
 ### Added — Design only (no code yet)

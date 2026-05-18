@@ -33,13 +33,14 @@
 ## 3. Поточний статус
 
 - **Версія концепції**: v2.0
-- **Поточний етап**: v1.0.0 змерджено в `main` — **pilot-ready**.
-  Опубліковано GitHub Release: https://github.com/Yevhen-Sh8/AAR/releases/tag/v1.0.0
-- **Гілка розробки**: `claude/equipment-tracking-system-3lB6U`
+- **Поточний етап**: Етап 11 v1.1 — Context Accumulation Layer **реалізовано**.
+  Запит на код-ревʼю в гілці `claude/equipment-tracking-system-3lB6U`.
+- v1.0.0 змерджено в `main` — pilot-ready; реліз
+  https://github.com/Yevhen-Sh8/AAR/releases/tag/v1.0.0
 - **Найближчі дії**:
-  - На стороні замовника — pilot deployment, restore-drill, звірка експортів № 440.
-  - Паралельно — design v1.1 (Етап 11): Context Accumulation Layer; готовий
-    дизайн-док [`v1.1-context-accumulation.md`](concept/v1.1-context-accumulation.md).
+  - Merge v1.1 у `main` після ревʼю → випустити v1.1.0.
+  - На стороні замовника — pilot deployment v1.0/v1.1, restore-drill,
+    звірка експортів № 440.
 - **Що вже є**:
   - 11 моделей: `User`, `ItemType`, `Operator`, `LossReason`, `RepairReason`,
     `Item`, `UsageEvent`, `AARCase`, `IndividualReport`, `Recommendation`,

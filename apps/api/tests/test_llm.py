@@ -41,8 +41,11 @@ async def test_classify_returns_503_when_llm_disabled() -> None:
 async def test_classify_with_mocked_anthropic() -> None:
     await _seed()
 
-    fake_result = llm_service.ClassifyResult(
-        code="b", confidence=0.92, rationale="згадка РЕБ → зовнішня зона"
+    fake_result = llm_service.LLMResult(
+        task_output=llm_service.ClassifyResult(
+            code="b", confidence=0.92, rationale="згадка РЕБ → зовнішня зона"
+        ),
+        context_assets=[],
     )
     with patch.object(llm_service, "classify_reason", return_value=fake_result):
         transport = ASGITransport(app=app)
@@ -62,8 +65,9 @@ async def test_classify_with_mocked_anthropic() -> None:
 async def test_draft_analysis_uses_case_context() -> None:
     case_id = await _seed()
     draft = "## Контекст\nТест.\n## Рекомендації\n1. Довчання."
+    fake = llm_service.LLMResult(task_output=draft, context_assets=[])
 
-    with patch.object(llm_service, "draft_case_analysis", return_value=draft) as m:
+    with patch.object(llm_service, "draft_case_analysis", return_value=fake) as m:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             r = await client.post(f"/llm/cases/{case_id}/draft-analysis")
