@@ -44,6 +44,7 @@
 | `RepairReason` | Причини повернення в ремонт, коди а–р | Адмін |
 | `ResponsibilityZone` | Зона: обслуга / виробництво / зовнішнє | Адмін |
 | `OutcomeStatus` | Запущено / Втрачено / На ремонт / Успіх | Системний |
+| `ContextAsset` *(v1.1)* | Reusable knowledge fragments (business_rule, failure_pattern, edge_case, …) із lifecycle `draft → validated → deprecated`. Деталі — у [v1.1 design doc](v1.1-context-accumulation.md). | Менеджер / Аналітик |
 
 ### 3.2. Ключові показники
 
