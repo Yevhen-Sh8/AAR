@@ -17,6 +17,7 @@
 | Питання | Файл |
 |---|---|
 | Філософія, що ми будуємо | [`docs/concept/AAR_v2.md`](concept/AAR_v2.md) |
+| План v1.1 (Context Accumulation Layer) | [`docs/concept/v1.1-context-accumulation.md`](concept/v1.1-context-accumulation.md) |
 | Що саме і коли робимо | [`docs/roadmap.md`](roadmap.md) |
 | Які процеси автоматизуються | [`docs/automation.md`](automation.md) |
 | Метрики (MSR, MSR_c, CLR), нотація | [`docs/metrics.md`](metrics.md) |
@@ -32,10 +33,14 @@
 ## 3. Поточний статус
 
 - **Версія концепції**: v2.0
-- **Поточний етап**: Етап 10 — безпека, аудит, готовність до пілоту. ✓
-- **Гілка розробки**: `claude/equipment-tracking-system-3lB6U`
-- **Найближчі дії**: пілотне розгортання у замовника, restore-drill,
-  звірка експортів № 440.
+- **Поточний етап**: Етап 11 v1.1 — Context Accumulation Layer **реалізовано**.
+  Запит на код-ревʼю в гілці `claude/equipment-tracking-system-3lB6U`.
+- v1.0.0 змерджено в `main` — pilot-ready; реліз
+  https://github.com/Yevhen-Sh8/AAR/releases/tag/v1.0.0
+- **Найближчі дії**:
+  - Merge v1.1 у `main` після ревʼю → випустити v1.1.0.
+  - На стороні замовника — pilot deployment v1.0/v1.1, restore-drill,
+    звірка експортів № 440.
 - **Що вже є**:
   - 11 моделей: `User`, `ItemType`, `Operator`, `LossReason`, `RepairReason`,
     `Item`, `UsageEvent`, `AARCase`, `IndividualReport`, `Recommendation`,
@@ -81,6 +86,9 @@
 | ADR-004 | LLM-класифікація з людською валідацією | Не довіряємо моделі сліпо; зберігаємо первинний текст |
 | ADR-005 | Append-only events + hash-chain | Цілісність обліку (ISO 27001 A.8) і вимоги наказу № 440 |
 | ADR-006 | ISO 27001/27002 замість КСЗІ | Актуальна практика 2025–2026 |
+| ADR-007 | Модель «двох результатів» LLM (Task Output + Context Asset) | Реалізує NATO LL цикл O→LL→Institutionalization; стаття Klochnyk 2026 |
+| ADR-008 | `ContextAsset.status` default = `draft`, validation тільки людиною | Уникнення «scaling mistakes» |
+| ADR-009 | `find_analogies` шукає тільки серед `validated` активів | shared context ≠ shared confusion |
 
 ## 7. Правила підтримки документації
 

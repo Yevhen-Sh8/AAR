@@ -26,6 +26,10 @@ class AuditAction(StrEnum):
     SUBSCRIPTION_CREATED = "subscription.created"
     SUBSCRIPTION_DELETED = "subscription.deleted"
     TRIGGERS_RUN = "triggers.run"
+    CONTEXT_ASSET_CREATED = "context_asset.created"
+    CONTEXT_ASSET_VALIDATED = "context_asset.validated"
+    CONTEXT_ASSET_REJECTED = "context_asset.rejected"
+    CONTEXT_ASSET_DEPRECATED = "context_asset.deprecated"
 
 
 class AuditLog(Base):

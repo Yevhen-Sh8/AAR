@@ -6,6 +6,7 @@ from aar_api.core.config import get_settings
 from aar_api.routers import (
     aar,
     audit,
+    context,
     dictionaries,
     events,
     exports,
@@ -40,3 +41,4 @@ app.include_router(llm.router)
 app.include_router(exports.router)
 app.include_router(integrations.router)
 app.include_router(audit.router)
+app.include_router(context.router)

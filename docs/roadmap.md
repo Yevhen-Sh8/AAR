@@ -74,6 +74,23 @@ Python + FastAPI, React + Vite PWA, PostgreSQL, Redis, Docker Compose
 - Пілот на одному експлуатанті з реальними даними листопада–грудня.
 - Acceptance: усі точки з §8 концепції відтворюються end-to-end.
 
+## Етап 11 — Context Accumulation Layer (v1.1, опційно)
+
+Реалізує модель **«Agent → Task Output + Reusable Context Asset»** з
+[design doc v1.1](concept/v1.1-context-accumulation.md). Доводить до кінця
+NATO LL-цикл (Observation → Lesson Identified → Lesson Learned →
+Institutionalization) у нашій реалізації.
+
+- Сутність `ContextAsset` (типи: `business_rule`, `failure_pattern`,
+  `edge_case`, `operator_practice`, `training_gap`, ін.).
+- LLM-функції повертають `LLMResult[T] = (task_output, context_assets[])`.
+- Validation lifecycle: `draft → validated/rejected → deprecated`.
+- API: `POST /context/{id}/validate|reject|deprecate`.
+- `find_analogies` шукає лише серед `validated`.
+- Нові метрики у місячному звіті: **assets-per-task, validation-rate,
+  reuse-rate, cycle-time reduction, SmartnessIndex**.
+- Оцінка зусиль: 2–3 дні MVP, 1 тиждень повна реалізація.
+
 ## Контрольні точки якості
 
 | Етап | Acceptance |
@@ -85,3 +102,4 @@ Python + FastAPI, React + Vite PWA, PostgreSQL, Redis, Docker Compose
 | 7 | 10 подій офлайн → авто-синхрон без втрат і дублів |
 | 8 | Реквізити експортів збігаються з додатками до наказу № 440 |
 | 10 | Hash-chain цілісність валідується аудитом |
+| 11 | Reuse-rate ≥ 30 % через 3 місяці після ввімкнення; SmartnessIndex росте місяць-до-місяця |

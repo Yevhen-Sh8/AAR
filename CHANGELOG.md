@@ -4,6 +4,73 @@
 Формат: [Keep a Changelog](https://keepachangelog.com/uk/1.1.0/),
 семантика дат — `РРРР-ММ-ДД`.
 
+## [v1.1.0-context-accumulation] — 2026-05-13
+
+### Added (Етап 11 — Context Accumulation Layer)
+- Реалізація моделі **«Agent → Task Output + Reusable Context Asset»**
+  згідно з [design doc](docs/concept/v1.1-context-accumulation.md).
+- Нові сутності: `ContextAsset` (8 типів) + `AssetUsage` (audit reuse).
+- Міграція `0006_context_assets`.
+- LLM-функції тепер повертають `LLMResult[T] = (task_output, context_assets[])`
+  з PEP 695 generic; промпти просять JSON-масив активів за схемою.
+- Validation lifecycle через сервіс `services/context_assets.py`:
+  `persist_drafts` / `validate_asset` / `reject_asset` / `deprecate_asset`
+  / `validated_assets` / `record_usage`. Кожна транзиція пише
+  специфічну `AuditAction.CONTEXT_ASSET_*` у hash-chain audit.
+- REST `/context/*`: list+filter (`type`, `status`, `source_agent`),
+  get, create (manual draft), validate (M/A/Admin), reject (M/A/Admin),
+  deprecate (M/Admin).
+- `find_analogies` тепер шукає **лише серед validated assets** (ADR-009),
+  записує `AssetUsage` для кожного матча (інкрементує `usage_count`).
+- LLM-роутер автоматично персистить чернетки активів після кожного
+  виклику через `_persist_assets_if_any` helper.
+
+### Tests
+- `tests/test_context.py` (5 нових): manual create starts as draft;
+  full lifecycle (draft→validate→deprecate); reject 409 на не-draft;
+  classify persists drafts; list filters by type/status.
+- Усього 37/37 pytest ✓.
+
+### Quality (after `simplify` review of three agents)
+- 4 справжніх баги виправлено:
+  1. `AuditAction` — додано 4 специфічних значення для context_assets,
+     прибрано зловживання `CASE_CREATED`/`RECOMMENDATION_UPDATED`.
+  2. `owner_role` — типізовано як `Role` enum (замість `String(32)`).
+  3. `find_analogies` — мігровано з legacy `KnowledgeEntry` на
+     `validated_assets()` (ADR-009).
+  4. `record_usage` — підключено у `find_analogies` flow.
+- 2 DRY-helper-и: `_get_asset` у роутері контексту,
+  `_persist_assets_if_any` у роутері LLM.
+- Вузький `ValidationError` замість `except Exception` у `_parse_assets`.
+
+## [v1.1.0-design] — 2026-05-13
+
+### Added — Design only (no code yet)
+- **`docs/concept/v1.1-context-accumulation.md`** — повний дизайн-документ
+  для наступного етапу, на основі статті Yaroslav Klochnyk «AI Agents
+  in the SDLC: Why Task Automation Is No Longer Enough»
+  (LinkedIn Pulse, 13.05.2026).
+- Модель «двох результатів» для всіх LLM-функцій:
+  `LLMResult[T] = (task_output, context_assets[])`.
+- Сутність `ContextAsset` (типи: business_rule, failure_pattern, edge_case,
+  operator_practice, training_gap, architectural_decision, deployment_lesson,
+  acceptance_criterion) з lifecycle `draft → validated → deprecated`.
+- Маппінг 1-в-1 на NATO LL Handbook 4 (Observation → LI → LL →
+  Institutionalization) — стаття Клочника дала промислову назву тому,
+  що NATO LL описує методологічно.
+- Нові метрики flywheel: assets-per-task, validation-rate, reuse-rate,
+  cycle-time reduction, **SmartnessIndex**.
+- Етап 11 «Context Accumulation Layer» додано у `docs/roadmap.md`.
+- ADR-007, ADR-008, ADR-009 додано в `docs/PROJECT.md` §6.
+- `docs/concept/AAR_v2.md` §3.1 — анонсовано `ContextAsset` як 7-й
+  довідник системи (з посиланням на v1.1 doc).
+- `docs/PROJECT.md` оновлено: статус (v1.0 merged + release published),
+  карта документації, plans для v1.1.
+
+### Notes
+Реалізація не входить у v1.0-пілот. Рекомендований перший фокус v1.1
+після збору фідбеку з пілотного впровадження v1.0.
+
 ## [v1.0.0-pilot-ready] — 2026-05-11
 
 ### Added (Етап 10 — безпека, аудит, готовність до пілоту)
