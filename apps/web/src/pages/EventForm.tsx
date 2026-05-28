@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { allEvents, type QueuedEvent } from "../lib/db";
 import { flushQueue, submitEvent } from "../lib/sync";
 
@@ -49,68 +50,110 @@ export default function EventForm() {
   }
 
   async function onSync() {
+    setBusy(true);
     await flushQueue();
     await refresh();
+    setBusy(false);
   }
 
-  return (
-    <section>
-      <h2>Подія використання</h2>
-      <p>
-        Стан мережі: <strong>{online ? "online" : "offline"}</strong>
-      </p>
-      <form onSubmit={onSubmit}>
-        <label>
-          Серійний № <input value={serial} onChange={(e) => setSerial(e.target.value)} required />
-        </label>{" "}
-        <label>
-          Тип{" "}
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="A">A</option>
-            <option value="B">B</option>
-          </select>
-        </label>{" "}
-        <label>
-          Експл.{" "}
-          <input value={operator} onChange={(e) => setOperator(e.target.value)} required />
-        </label>{" "}
-        <label>
-          Дата <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>{" "}
-        <label>
-          Результат{" "}
-          <select
-            value={outcome}
-            onChange={(e) => setOutcome(e.target.value as typeof outcome)}
-          >
-            <option value="success">success</option>
-            <option value="lost">lost</option>
-            <option value="repair">repair</option>
-          </select>
-        </label>{" "}
-        {outcome !== "success" && (
-          <label>
-            Причина <input value={reason} onChange={(e) => setReason(e.target.value)} required />
-          </label>
-        )}{" "}
-        <button type="submit" disabled={busy}>
-          Подати
-        </button>
-      </form>
+  const pending = queue.filter((q) => q.status === "pending").length;
+  const synced = queue.filter((q) => q.status === "synced").length;
 
-      <h3>Локальна черга ({queue.length})</h3>
-      <button onClick={onSync} disabled={busy}>
-        Синхронізувати зараз
-      </button>
-      <ul>
-        {queue.map((q) => (
-          <li key={q.client_event_id}>
-            <code>{q.client_event_id.slice(0, 8)}</code> · {q.status}
-            {q.server_id !== null ? ` · server #${q.server_id}` : ""}
-            {q.last_error ? ` · err: ${q.last_error}` : ""}
-          </li>
-        ))}
-      </ul>
-    </section>
+  return (
+    <div className="dashboard-grid">
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Подати подію</span>
+          <span className={`card-badge ${online ? "badge-green" : "badge-red"}`}>
+            {online ? <><Wifi size={12} /> Online</> : <><WifiOff size={12} /> Offline</>}
+          </span>
+        </div>
+        <form onSubmit={onSubmit}>
+          <div className="form-grid">
+            <label>
+              Серійний №
+              <input value={serial} onChange={(e) => setSerial(e.target.value)} required placeholder="A-00001" />
+            </label>
+            <label>
+              Тип виробу
+              <select value={type} onChange={(e) => setType(e.target.value)}>
+                <option value="A">A</option>
+                <option value="B">B</option>
+              </select>
+            </label>
+            <label>
+              Експлуатант
+              <input value={operator} onChange={(e) => setOperator(e.target.value)} required placeholder="E-01" />
+            </label>
+            <label>
+              Дата
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+            <label>
+              Результат
+              <select value={outcome} onChange={(e) => setOutcome(e.target.value as typeof outcome)}>
+                <option value="success">Success</option>
+                <option value="lost">Lost</option>
+                <option value="repair">Repair</option>
+              </select>
+            </label>
+            {outcome !== "success" && (
+              <label>
+                Код причини
+                <input value={reason} onChange={(e) => setReason(e.target.value)} required placeholder="a" />
+              </label>
+            )}
+          </div>
+          <button type="submit" disabled={busy}>Подати</button>
+        </form>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">Локальна черга</span>
+          <span className="card-badge badge-gold">{pending} pending</span>
+        </div>
+        <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+          <div className="stat-item">
+            <div className="stat-label">Pending</div>
+            <div className="stat-value" style={{ color: "var(--accent-gold)" }}>{pending}</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-label">Synced</div>
+            <div className="stat-value" style={{ color: "var(--accent-green)" }}>{synced}</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-label">Total</div>
+            <div className="stat-value">{queue.length}</div>
+          </div>
+        </div>
+        <button className="secondary" onClick={onSync} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <RefreshCw size={14} /> Синхронізувати зараз
+        </button>
+        <div style={{ marginTop: 12, maxHeight: 300, overflow: "auto" }}>
+          {queue.slice(-10).reverse().map((q) => (
+            <div
+              key={q.client_event_id}
+              style={{
+                padding: "6px 0",
+                borderBottom: "1px solid var(--border-muted)",
+                fontSize: 12,
+                color: "var(--text-secondary)",
+              }}
+            >
+              <code>{q.client_event_id.slice(0, 8)}</code>
+              {" · "}
+              <span className={`card-badge ${
+                q.status === "synced" ? "badge-green" : q.status === "pending" ? "badge-gold" : "badge-red"
+              }`}>
+                {q.status}
+              </span>
+              {q.server_id !== null && ` · #${q.server_id}`}
+              {q.last_error && <span style={{ color: "var(--accent-red)" }}> · {q.last_error}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

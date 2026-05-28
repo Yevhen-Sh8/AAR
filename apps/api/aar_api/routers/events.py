@@ -1,7 +1,8 @@
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,7 @@ from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairRe
 from aar_api.models.event import Item, Outcome, UsageEvent
 from aar_api.schemas.event import UsageEventIn, UsageEventOut
 from aar_api.services.audit import append as audit_append
+from aar_api.services.imports import parse_bytes
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -111,3 +113,118 @@ async def list_events(
     stmt = stmt.order_by(UsageEvent.event_date.desc(), UsageEvent.id.desc()).limit(limit)
     rows = await session.scalars(stmt)
     return list(rows)
+
+
+class ImportRowError(BaseModel):
+    row: int
+    message: str
+
+
+class ImportSummary(BaseModel):
+    total_rows: int
+    parsed: int
+    imported: int
+    duplicates: int
+    failed: int
+    parse_errors: list[ImportRowError]
+    persist_errors: list[ImportRowError]
+    dry_run: bool
+
+
+async def _persist_event(
+    session: AsyncSession, payload: UsageEventIn
+) -> tuple[int, bool]:
+    """Returns (event_id, is_duplicate). Raises on dictionary mismatch."""
+    if payload.client_event_id:
+        existing = await session.scalar(
+            select(UsageEvent).where(UsageEvent.client_event_id == payload.client_event_id)
+        )
+        if existing is not None:
+            return existing.id, True
+
+    item_type_id = await _resolve_code(session, ItemType, payload.item_type_code)
+    operator_id = await _resolve_code(session, Operator, payload.operator_code)
+    item = await _get_or_create_item(session, payload.item_serial_no, item_type_id)
+
+    loss_id = (
+        await _resolve_code(session, LossReason, payload.loss_reason_code)
+        if payload.loss_reason_code
+        else None
+    )
+    repair_id = (
+        await _resolve_code(session, RepairReason, payload.repair_reason_code)
+        if payload.repair_reason_code
+        else None
+    )
+    event = UsageEvent(
+        client_event_id=payload.client_event_id,
+        item_id=item.id,
+        operator_id=operator_id,
+        event_date=payload.event_date,
+        outcome=payload.outcome,
+        loss_reason_id=loss_id,
+        repair_reason_id=repair_id,
+        notes=payload.notes,
+    )
+    session.add(event)
+    await session.flush()
+    return event.id, False
+
+
+@router.post("/import", response_model=ImportSummary)
+async def import_events(
+    file: UploadFile = File(...),
+    dry_run: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+) -> ImportSummary:
+    """Bulk-import events from a CSV or XLSX file.
+
+    `dry_run=true` validates and reports without persisting.
+    """
+    data = await file.read()
+    if not file.filename:
+        raise HTTPException(400, "filename required")
+    preview = parse_bytes(file.filename, data)
+
+    parse_errors = [
+        ImportRowError(row=e.row, message=e.message) for e in preview.errors
+    ]
+    persist_errors: list[ImportRowError] = []
+    imported = 0
+    duplicates = 0
+
+    if not dry_run:
+        for i, ev in enumerate(preview.parsed, start=2):
+            try:
+                _, is_dup = await _persist_event(session, ev)
+                if is_dup:
+                    duplicates += 1
+                else:
+                    imported += 1
+            except HTTPException as e:
+                persist_errors.append(ImportRowError(row=i, message=str(e.detail)))
+        if imported > 0:
+            await audit_append(
+                session,
+                action=AuditAction.EVENT_INBOUND,
+                entity_type="usage_event_batch",
+                entity_id=0,
+                payload={
+                    "source": file.filename,
+                    "imported": imported,
+                    "duplicates": duplicates,
+                    "failed": len(parse_errors) + len(persist_errors),
+                },
+            )
+        await session.commit()
+
+    return ImportSummary(
+        total_rows=preview.total_rows,
+        parsed=len(preview.parsed),
+        imported=imported,
+        duplicates=duplicates,
+        failed=len(parse_errors) + len(persist_errors),
+        parse_errors=parse_errors,
+        persist_errors=persist_errors,
+        dry_run=dry_run,
+    )
