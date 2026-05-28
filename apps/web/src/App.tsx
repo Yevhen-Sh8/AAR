@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { installAutoSync } from "./lib/sync";
+import { IS_DEMO } from "./lib/api";
 import Dashboard from "./pages/Dashboard";
 import EventsPage from "./pages/EventsPage";
 import EventForm from "./pages/EventForm";
@@ -45,7 +46,25 @@ function Sidebar() {
   const { pathname } = useLocation();
   return (
     <nav className="sidebar">
-      <div className="sidebar-logo">AAR</div>
+      <div className="sidebar-logo">
+        AAR
+        {IS_DEMO && (
+          <span
+            style={{
+              fontSize: 10,
+              padding: "2px 6px",
+              marginLeft: 8,
+              background: "var(--accent-gold-muted)",
+              color: "var(--accent-gold)",
+              borderRadius: 4,
+              fontWeight: 600,
+              letterSpacing: 0,
+            }}
+          >
+            DEMO
+          </span>
+        )}
+      </div>
       {NAV.map((item, i) =>
         "section" in item ? (
           <div className="sidebar-section" key={i}>{item.section}</div>
