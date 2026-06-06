@@ -1,0 +1,12 @@
+{
+  "kinds": ["generic", "odin", "delta", "kropyva", "sap"],
+  "events": ["usage_event_created", "case_opened", "case_closed", "recommendation_created"],
+  "excluded": ["oberig"],
+  "notes": {
+    "delta": "Огортає подію у GeoJSON FeatureCollection",
+    "kropyva": "Один GeoJSON Feature — для прямого імпорту на мапу",
+    "odin": "C2-envelope з timestamp/actor/subject/geo",
+    "sap": "Плоский one-level запис з PascalCase полями",
+    "generic": "Pass-through {event, data} envelope"
+  }
+}

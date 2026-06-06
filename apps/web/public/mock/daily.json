@@ -1,0 +1,20 @@
+{
+  "report_date": "2026-06-03",
+  "rows": [
+    {"operator_code": "Е-01", "item_type_code": "A", "launched": 8, "lost": 0, "repaired": 1, "success": 7},
+    {"operator_code": "Е-01", "item_type_code": "B", "launched": 5, "lost": 1, "repaired": 0, "success": 4},
+    {"operator_code": "Е-02", "item_type_code": "A", "launched": 6, "lost": 0, "repaired": 1, "success": 5},
+    {"operator_code": "Е-03", "item_type_code": "A", "launched": 9, "lost": 1, "repaired": 1, "success": 7},
+    {"operator_code": "Е-03", "item_type_code": "B", "launched": 4, "lost": 0, "repaired": 0, "success": 4},
+    {"operator_code": "Е-05", "item_type_code": "A", "launched": 7, "lost": 0, "repaired": 0, "success": 7},
+    {"operator_code": "Е-07", "item_type_code": "A", "launched": 11, "lost": 3, "repaired": 2, "success": 6},
+    {"operator_code": "Е-09", "item_type_code": "B", "launched": 5, "lost": 0, "repaired": 1, "success": 4}
+  ],
+  "totals": {
+    "launched": 55,
+    "lost": 5,
+    "repaired": 6,
+    "success": 44,
+    "msr": 0.8
+  }
+}
