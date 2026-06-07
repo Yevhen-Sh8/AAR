@@ -26,7 +26,7 @@ TODO для пілотного впровадження (інфраструкт�
 | **A.8.20** | Безпека мереж | TLS 1.3 на nginx; внутрішня мережа Docker; egress по allow-list. |
 | **A.8.21** | Безпека мережевих сервісів | nginx security headers (CSP, X-Frame-Options, Referrer-Policy) — `apps/web/nginx.conf`. |
 | **A.8.24 (at-rest)** | Шифрування дисків | LUKS на host-системі / TDE Postgres / pgcrypto для PII. |
-| **A.8.28** | Безпечне кодування | ruff + mypy strict-режим у CI; залежності перевіряються `pip-audit` (TODO). |
+| **A.8.28** | Безпечне кодування | ruff + mypy strict-режим у CI; залежності перевіряються `pip-audit` у CI-джобі `audit` (.github/workflows/ci.yml). |
 
 ## Hash-chain аудиту — деталі
 

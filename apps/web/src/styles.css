@@ -299,3 +299,195 @@ button.secondary {
   color: var(--text-secondary);
   border: 1px solid var(--border);
 }
+button.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+}
+button.icon-btn:hover { color: var(--accent-red); }
+
+/* ───── Generic page stack ───── */
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+/* ───── Tabs ───── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.tab {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tab:hover { color: var(--text-primary); }
+.tab-active {
+  color: var(--accent-gold);
+  border-bottom-color: var(--accent-gold);
+}
+
+/* ───── Form input ───── */
+.form-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.form-input:focus { outline: 1px solid var(--accent-blue); }
+
+/* ───── Generic data table ───── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  position: sticky;
+  top: 0;
+}
+.data-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border-muted);
+  vertical-align: middle;
+}
+.data-table tr:hover td { background: var(--bg-card-hover); }
+.data-table .mono, .mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ───── Key-value table (entity detail) ───── */
+.kv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.kv-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.kv-table td:first-child {
+  color: var(--text-muted);
+  width: 40%;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ───── Chip ───── */
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.chip-active { background: var(--accent-green-muted); color: var(--accent-green); }
+.chip-draft { background: var(--accent-gold-muted); color: var(--accent-gold); }
+.chip-error { background: var(--accent-red-muted); color: var(--accent-red); }
+.chip-high { background: var(--accent-green-muted); color: var(--accent-green); }
+.chip-mid { background: var(--accent-blue-muted); color: var(--accent-blue); }
+.chip-low { background: var(--accent-gold-muted); color: var(--accent-gold); }
+.chip-needs_training { background: var(--accent-red-muted); color: var(--accent-red); }
+
+/* ───── Link-styled buttons ───── */
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  text-decoration: none;
+}
+.btn-link:hover { color: var(--text-primary); }
+
+/* ───── Connector grid ───── */
+.connector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.connector-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.connector-card.connector-excluded {
+  border-color: var(--accent-red);
+  opacity: 0.6;
+}
+.connector-name {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+.connector-note { font-size: 12px; color: var(--text-secondary); }
+
+/* ───── Context split (list + detail) ───── */
+.context-split {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 2fr;
+  gap: 16px;
+  min-height: 400px;
+}
+.context-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.asset-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.asset-card:hover { border-color: var(--accent-blue); }
+.asset-card.asset-selected { border-color: var(--accent-gold); background: var(--bg-card-hover); }
+.asset-title { font-weight: 500; margin: 6px 0; font-size: 13px; }
+.asset-meta { font-size: 11px; color: var(--text-muted); }
+.context-detail {
+  background: var(--bg-input);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+/* ───── Responsive: collapse the dashboard / context grids on narrow screens ───── */
+@media (max-width: 900px) {
+  .dashboard-grid, .context-split { grid-template-columns: 1fr; }
+  .sidebar { width: 60px; }
+  .sidebar a { font-size: 0; padding: 12px 20px; }
+  .sidebar a svg { width: 20px; height: 20px; }
+  .sidebar-section, .sidebar-logo span { display: none; }
+  .main { margin-left: 60px; }
+}

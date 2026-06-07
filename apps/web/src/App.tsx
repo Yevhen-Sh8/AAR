@@ -11,6 +11,7 @@ import {
   Plug,
   Shield,
   Upload,
+  BookOpen,
 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { installAutoSync } from "./lib/sync";
@@ -20,6 +21,12 @@ import EventsPage from "./pages/EventsPage";
 import EventForm from "./pages/EventForm";
 import CasesPage from "./pages/CasesPage";
 import ImportPage from "./pages/ImportPage";
+import ContextPage from "./pages/ContextPage";
+import ReportsPage from "./pages/ReportsPage";
+import IntegrationsPage from "./pages/IntegrationsPage";
+import AuditPage from "./pages/AuditPage";
+import SettingsPage from "./pages/SettingsPage";
+import DictionariesPage from "./pages/DictionariesPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -37,6 +44,7 @@ const NAV = [
   { section: "Звіти" },
   { to: "/reports", icon: FileBarChart, label: "Звіти" },
   { section: "Система" },
+  { to: "/dictionaries", icon: BookOpen, label: "Довідники" },
   { to: "/integrations", icon: Plug, label: "Інтеграції" },
   { to: "/audit", icon: Shield, label: "Аудит" },
   { to: "/settings", icon: Settings, label: "Налаштування" },
@@ -83,17 +91,6 @@ function Sidebar() {
   );
 }
 
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div className="card" style={{ textAlign: "center", padding: 40 }}>
-      <h2>{title}</h2>
-      <p style={{ color: "var(--text-secondary)", marginTop: 8 }}>
-        Сторінка у розробці
-      </p>
-    </div>
-  );
-}
-
 export default function App() {
   useEffect(() => installAutoSync(), []);
   return (
@@ -107,11 +104,12 @@ export default function App() {
             <Route path="/event-form" element={<EventForm />} />
             <Route path="/import" element={<ImportPage />} />
             <Route path="/cases" element={<CasesPage />} />
-            <Route path="/context" element={<Placeholder title="Контекст-активи" />} />
-            <Route path="/reports" element={<Placeholder title="Звіти" />} />
-            <Route path="/integrations" element={<Placeholder title="Інтеграції" />} />
-            <Route path="/audit" element={<Placeholder title="Аудит" />} />
-            <Route path="/settings" element={<Placeholder title="Налаштування" />} />
+            <Route path="/context" element={<ContextPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/dictionaries" element={<DictionariesPage />} />
+            <Route path="/integrations" element={<IntegrationsPage />} />
+            <Route path="/audit" element={<AuditPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </main>
       </div>
