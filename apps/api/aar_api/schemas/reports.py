@@ -45,6 +45,17 @@ class RepairDetail(BaseModel):
     notes: str | None = None
 
 
+class DailyConclusions(BaseModel):
+    """Auto-generated 'Висновки доби' block — required by the form spec
+    (docs/forms/daily-template.md §2)."""
+
+    top_loss_reasons: list[str]  # e.g. ["c (×3) — обслуга", "a (×2) — обслуга"]
+    top_repair_reasons: list[str]
+    active_triggers: list[str]  # case titles created today
+    open_recommendations: int
+    headline: str  # one-line summary in Ukrainian
+
+
 class DailyReport(BaseModel):
     report_date: date
     rows: list[DailyRow]
@@ -53,3 +64,4 @@ class DailyReport(BaseModel):
     loss_breakdown: list[LossReasonBreakdown]
     repair_details: list[RepairDetail]
     repair_breakdown: list[RepairReasonBreakdown]
+    conclusions: DailyConclusions | None = None

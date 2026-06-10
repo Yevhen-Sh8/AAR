@@ -17,9 +17,15 @@ async def run(today: date) -> None:
     engine = create_async_engine(get_settings().database_url)
     Session = async_sessionmaker(engine, expire_on_commit=False)
     async with Session() as session:
-        created, skipped = await evaluate_triggers(session, today, TriggerConfig())
+        created, skipped, auto_validated, regressed = await evaluate_triggers(
+            session, today, TriggerConfig()
+        )
         await session.commit()
         print(f"Created {len(created)} cases, skipped {skipped} (already exist).")
+        print(
+            f"Auto-validated {len(auto_validated)} recommendations; "
+            f"regressed {len(regressed)} on recurrence."
+        )
         for case in created:
             print(f"  #{case.id} [{case.trigger}] {case.title}")
     await engine.dispose()

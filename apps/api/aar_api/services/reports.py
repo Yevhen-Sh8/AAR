@@ -1,13 +1,15 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from aar_api.models.aar import AARCase, Recommendation, RecommendationStatus
 from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairReason
 from aar_api.models.event import Item, Outcome, UsageEvent
 from aar_api.schemas.reports import (
+    DailyConclusions,
     DailyReport,
     DailyRow,
     LossDetail,
@@ -126,6 +128,14 @@ async def build_daily_report(session: AsyncSession, report_date: date) -> DailyR
         success=totals["success"],
         msr=_msr(totals["success"], totals["launched"]),
     )
+    conclusions = await _build_conclusions(
+        session,
+        report_date,
+        totals_row,
+        sorted(loss_break.values(), key=lambda b: -b.count),
+        sorted(repair_break.values(), key=lambda b: -b.count),
+    )
+
     return DailyReport(
         report_date=report_date,
         rows=rows,
@@ -136,4 +146,58 @@ async def build_daily_report(session: AsyncSession, report_date: date) -> DailyR
         repair_breakdown=sorted(
             repair_break.values(), key=lambda b: (b.item_type_code, b.reason_code)
         ),
+        conclusions=conclusions,
+    )
+
+
+async def _build_conclusions(
+    session: AsyncSession,
+    report_date: date,
+    totals: DailyRow,
+    losses_sorted: list[LossReasonBreakdown],
+    repairs_sorted: list[RepairReasonBreakdown],
+) -> DailyConclusions:
+    """Generate the 'Висновки доби' block per docs/forms/daily-template.md §2."""
+    top_losses = [
+        f"{b.reason_code} (×{b.count}) — {b.zone.value}" for b in losses_sorted[:3]
+    ]
+    top_repairs = [
+        f"{b.reason_code} (×{b.count}) — {b.zone.value}" for b in repairs_sorted[:3]
+    ]
+
+    day_start = datetime.combine(report_date, time.min)
+    day_end = day_start + timedelta(days=1)
+    cases_today = list(
+        await session.scalars(
+            select(AARCase).where(
+                AARCase.opened_at >= day_start,
+                AARCase.opened_at < day_end,
+            )
+        )
+    )
+    triggers = [c.title for c in cases_today]
+
+    open_recs = await session.scalar(
+        select(func.count(Recommendation.id)).where(
+            Recommendation.status.in_(
+                [RecommendationStatus.PROPOSED, RecommendationStatus.IN_PROGRESS]
+            )
+        )
+    )
+
+    headline = (
+        f"η = {totals.msr * 100:.1f}%, запущено {totals.launched}, "
+        f"успіх {totals.success}, втрат {totals.lost}, ремонт {totals.repaired}."
+    )
+    if not triggers and totals.lost == 0:
+        headline += " Доба без інцидентів."
+    elif triggers:
+        headline += f" Активних тригерів: {len(triggers)}."
+
+    return DailyConclusions(
+        top_loss_reasons=top_losses or ["—"],
+        top_repair_reasons=top_repairs or ["—"],
+        active_triggers=triggers,
+        open_recommendations=int(open_recs or 0),
+        headline=headline,
     )

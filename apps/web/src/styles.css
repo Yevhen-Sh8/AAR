@@ -482,6 +482,76 @@ button.icon-btn:hover { color: var(--accent-red); }
   padding: 20px;
 }
 
+/* ───── NATO LL cycle UI ───── */
+.stage-columns {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  overflow-x: auto;
+}
+.stage-col {
+  background: var(--bg-input);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 100px;
+}
+.stage-col-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 4px 6px 8px;
+  border-bottom: 1px solid var(--border-muted);
+  margin-bottom: 6px;
+}
+.case-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.case-card:hover { border-color: var(--accent-blue); }
+.case-card.case-selected { border-color: var(--accent-gold); }
+.case-title { font-size: 12px; font-weight: 500; }
+.case-meta { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+.case-empty { font-size: 11px; color: var(--text-muted); text-align: center; padding: 4px; }
+
+.stage-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.stage-pill {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.stage-pill.stage-todo { background: var(--bg-input); color: var(--text-muted); }
+.stage-pill.stage-current { background: var(--accent-gold-muted); color: var(--accent-gold); font-weight: 600; }
+.stage-pill.stage-done { background: var(--accent-green-muted); color: var(--accent-green); }
+
+.nato-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.nato-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.nato-grid textarea {
+  font-family: inherit;
+  resize: vertical;
+}
+
 /* ───── Responsive: collapse the dashboard / context grids on narrow screens ───── */
 @media (max-width: 900px) {
   .dashboard-grid, .context-split { grid-template-columns: 1fr; }

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.db import get_session
 from aar_api.models.aar import (
+    ALLOWED_TRANSITIONS,
     AARCase,
     CaseStatus,
     IndividualReport,
@@ -18,6 +19,8 @@ from aar_api.models.dictionaries import Operator
 from aar_api.schemas.aar import (
     AARCaseIn,
     AARCaseOut,
+    AARCasePatch,
+    CaseTransitionIn,
     IndividualReportIn,
     IndividualReportOut,
     RecommendationIn,
@@ -52,6 +55,9 @@ async def create_case(
         title=payload.title,
         operator_id=op_id,
         summary=payload.summary,
+        what_was_planned=payload.what_was_planned,
+        what_happened=payload.what_happened,
+        opr=payload.opr,
         trigger=TriggerType.MANUAL,
     )
     session.add(case)
@@ -88,8 +94,76 @@ async def get_case(case_id: int, session: AsyncSession = Depends(get_session)) -
     return await _get_case(session, case_id)
 
 
+@router.patch("/cases/{case_id}", response_model=AARCaseOut)
+async def patch_case(
+    case_id: int,
+    payload: AARCasePatch,
+    session: AsyncSession = Depends(get_session),
+) -> AARCase:
+    """Edit NATO LL narrative fields (analysis, lesson_identified, etc.).
+
+    Status changes must go through /transition.
+    """
+    case = await _get_case(session, case_id)
+    data = payload.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        setattr(case, k, v)
+    if "analysis" in data and data["analysis"]:
+        case.analysis_source = case.analysis_source or "manual"
+        case.analysis_drafted_at = case.analysis_drafted_at or datetime.now(UTC)
+        await audit_append(
+            session,
+            action=AuditAction.CASE_ANALYSIS_DRAFTED,
+            entity_type="aar_case",
+            entity_id=case.id,
+            payload={"source": case.analysis_source, "via": "patch"},
+        )
+    await session.commit()
+    await session.refresh(case)
+    return case
+
+
+@router.post("/cases/{case_id}/transition", response_model=AARCaseOut)
+async def transition_case(
+    case_id: int,
+    payload: CaseTransitionIn,
+    session: AsyncSession = Depends(get_session),
+) -> AARCase:
+    """Move case along the NATO LL state machine.
+
+    Forward-only by default; `force=True` allows admin overrides (used by
+    automated regression).
+    """
+    case = await _get_case(session, case_id)
+    target = payload.to
+    if not payload.force:
+        allowed = ALLOWED_TRANSITIONS.get(case.status, set())
+        if target not in allowed:
+            raise HTTPException(
+                409,
+                f"transition {case.status.value} → {target.value} not allowed "
+                f"(allowed: {sorted(s.value for s in allowed)})",
+            )
+    prev = case.status
+    case.status = target
+    if target == CaseStatus.CLOSED:
+        case.closed_at = datetime.now(UTC)
+    await audit_append(
+        session,
+        action=AuditAction.CASE_TRANSITIONED,
+        entity_type="aar_case",
+        entity_id=case.id,
+        payload={"from": prev.value, "to": target.value, "note": payload.note},
+    )
+    await session.commit()
+    await session.refresh(case)
+    return case
+
+
 @router.post("/cases/{case_id}/close", response_model=AARCaseOut)
 async def close_case(case_id: int, session: AsyncSession = Depends(get_session)) -> AARCase:
+    """Legacy shortcut: jump directly to CLOSED. Prefer /transition for
+    proper NATO-cycle tracking."""
     case = await _get_case(session, case_id)
     case.status = CaseStatus.CLOSED
     case.closed_at = datetime.now(UTC)
@@ -142,8 +216,16 @@ async def add_recommendation(
     payload: RecommendationIn,
     session: AsyncSession = Depends(get_session),
 ) -> Recommendation:
-    await _get_case(session, case_id)
-    rec = Recommendation(case_id=case_id, text=payload.text)
+    case = await _get_case(session, case_id)
+    sig = payload.signature
+    if sig is None and case.title and "[" in case.title:
+        # Extract auto-trigger signature from the case title pattern "[T#:key:date]"
+        import re
+
+        m = re.search(r"\[(T\d:[^\]]+)\]", case.title)
+        if m:
+            sig = m.group(1)
+    rec = Recommendation(case_id=case_id, text=payload.text, signature=sig)
     session.add(rec)
     await session.commit()
     await session.refresh(rec)
@@ -165,6 +247,16 @@ async def update_recommendation_status(
     rec.status = payload.status
     if payload.status == RecommendationStatus.VALIDATED:
         rec.validated_at = datetime.now(UTC)
+    elif payload.status == RecommendationStatus.DONE:
+        # Stamp validated_at as the "DONE since" marker for auto-validation.
+        rec.validated_at = datetime.now(UTC)
+    await audit_append(
+        session,
+        action=AuditAction.RECOMMENDATION_UPDATED,
+        entity_type="recommendation",
+        entity_id=rec.id,
+        payload={"status": rec.status.value},
+    )
     await session.commit()
     await session.refresh(rec)
     return rec
@@ -175,8 +267,13 @@ async def run_triggers(
     today: date = Query(default_factory=lambda: datetime.now(UTC).date()),
     session: AsyncSession = Depends(get_session),
 ) -> TriggerResult:
-    created, skipped = await evaluate_triggers(session, today, TriggerConfig())
+    created, skipped, auto_validated, regressed = await evaluate_triggers(
+        session, today, TriggerConfig()
+    )
     await session.commit()
     return TriggerResult(
-        created_case_ids=[c.id for c in created], skipped_existing=skipped
+        created_case_ids=[c.id for c in created],
+        skipped_existing=skipped,
+        auto_validated_recommendation_ids=auto_validated,
+        regressed_recommendation_ids=regressed,
     )
