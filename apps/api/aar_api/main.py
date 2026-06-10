@@ -12,6 +12,7 @@ from aar_api.routers import (
     exports,
     health,
     integrations,
+    learning,
     llm,
     reports,
 )
@@ -42,3 +43,4 @@ app.include_router(exports.router)
 app.include_router(integrations.router)
 app.include_router(audit.router)
 app.include_router(context.router)
+app.include_router(learning.router)

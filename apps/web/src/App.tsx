@@ -12,6 +12,7 @@ import {
   Shield,
   Upload,
   BookOpen,
+  Activity,
 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { installAutoSync } from "./lib/sync";
@@ -27,6 +28,7 @@ import IntegrationsPage from "./pages/IntegrationsPage";
 import AuditPage from "./pages/AuditPage";
 import SettingsPage from "./pages/SettingsPage";
 import DictionariesPage from "./pages/DictionariesPage";
+import LearningLoopPage from "./pages/LearningLoopPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -43,6 +45,7 @@ const NAV = [
   { to: "/context", icon: Library, label: "Контекст-активи" },
   { section: "Звіти" },
   { to: "/reports", icon: FileBarChart, label: "Звіти" },
+  { to: "/learning-loop", icon: Activity, label: "Цикл навчання" },
   { section: "Система" },
   { to: "/dictionaries", icon: BookOpen, label: "Довідники" },
   { to: "/integrations", icon: Plug, label: "Інтеграції" },
@@ -106,6 +109,7 @@ export default function App() {
             <Route path="/cases" element={<CasesPage />} />
             <Route path="/context" element={<ContextPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/learning-loop" element={<LearningLoopPage />} />
             <Route path="/dictionaries" element={<DictionariesPage />} />
             <Route path="/integrations" element={<IntegrationsPage />} />
             <Route path="/audit" element={<AuditPage />} />

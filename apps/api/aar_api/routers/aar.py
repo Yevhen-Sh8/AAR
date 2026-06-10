@@ -146,8 +146,15 @@ async def transition_case(
             )
     prev = case.status
     case.status = target
+    now = datetime.now(UTC)
+    if target == CaseStatus.VALIDATED and case.validated_at is None:
+        case.validated_at = now
     if target == CaseStatus.CLOSED:
-        case.closed_at = datetime.now(UTC)
+        case.closed_at = now
+        # If validated_at wasn't stamped (legacy flow), stamp it now so KPIs
+        # still get a sane value.
+        if case.validated_at is None:
+            case.validated_at = now
     await audit_append(
         session,
         action=AuditAction.CASE_TRANSITIONED,

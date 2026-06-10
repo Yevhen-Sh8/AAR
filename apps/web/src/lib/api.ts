@@ -16,6 +16,7 @@ const MOCK_ROUTES: Record<string, string> = {
   "/integrations/subscriptions": "/integrations-subscriptions.json",
   "/integrations/deliveries": "/integrations-deliveries.json",
   "/integrations/connectors": "/integrations-connectors.json",
+  "/learning/loop-kpi": "/loop-kpi.json",
 };
 
 function resolveDemoPath(path: string): string {

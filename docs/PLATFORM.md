@@ -7,7 +7,7 @@
 > впливає на поведінку системи. Якщо ти агент — починай тут.
 
 **Останнє оновлення:** 2026-06-10
-**Поточна версія:** v1.1 (Context Accumulation Layer) + Wave 1 (NATO LL cycle)
+**Поточна версія:** v1.1 (Context Accumulation Layer) + Wave 1 (NATO LL cycle) + Wave 2 (Learning-loop KPIs)
 **Активна гілка розробки:** `claude/equipment-tracking-system-3lB6U`
 **Жива демо-версія:** https://yevhen-sh8.github.io/AAR/
 
@@ -198,6 +198,30 @@ launched-pool. Для повної інтерпретації див. `docs/metr
 - Тести: `test_nato_cycle.py` (5 кейсів) — state machine, PATCH, auto-validation,
   auto-regression, daily conclusions.
 
+### Wave 2 — Виміряти саме навчання
+- Міграція 0008 додає: `usage_events.aborted` (bool) + `abort_reason` (str),
+  `item_types.unit_cost_usd` (numeric), `aar_cases.validated_at` (datetime
+  stamped при переході в VALIDATED).
+- Нова сторінка-роутер `/learning/loop-kpi` (`routers/learning.py`) повертає
+  мета-KPI циклу навчання — закриває причину смерті LL-систем #2 за
+  літературою («no measurable benefit → leadership stops sponsoring»).
+- `services/learning_metrics.py::compute_loop_kpi` обчислює:
+  - **`time_to_validation_days_median`** і `_p90` — швидкість циклу
+  - **`li_to_ll_conversion_pct`** — % кейсів, що дійшли до validated
+  - **`recurrence_rate_pct`** — % валідованих рекомендацій, які регресували
+  - **`open_cases_by_opr`** — навантаження на відповідальних
+  - **`msr_narrow` vs `msr_full`** — обидва знаменники (з літератури:
+    narrow ~43%, full 20–30%)
+  - **`cost_per_effect_usd_by_type`** — cheap-mass арифметика
+- Транзишн в VALIDATED тепер автоматично штампує `validated_at`.
+- Нова UI-сторінка `LearningLoopPage.tsx` (маршрут `/learning-loop`,
+  іконка Activity, секція «Звіти») — 4 meta-картки + MSR-double + cost-table
+  + OPR-load таблиця.
+- Demo mock `loop-kpi.json`.
+- Тести: `test_learning_metrics.py` (7 кейсів) — endpoint shape, time_to_validation
+  median, LI→LL pct, recurrence pct, MSR narrow vs full, cost-per-effect,
+  OPR grouping.
+
 ---
 
 ## 5. Що НЕ зроблено і чому
@@ -229,19 +253,31 @@ launched-pool. Для повної інтерпретації див. `docs/metr
 - **ADR-009** — `find_analogies` шукає тільки серед `validated`.
 - **ADR-010 (новий, Wave 1)** — NATO state machine жорстка, forward-only.
   Регресія дозволена лише автоматичній автовалідації, не людині-вручну.
-- **ADR-011 (новий, Wave 1)** — LLM draft зберігається в кейс. Поле `analysis`
+- **ADR-011 (Wave 1)** — LLM draft зберігається в кейс. Поле `analysis`
   оновлюється тільки якщо було порожнім (не перетирає людський текст).
+- **ADR-012 (Wave 2)** — `aborted` як окрема булева, не виокремлений Outcome.
+  *Чому:* аборти — це аспект події (не дійшло до запуску), результат лишається
+  валідним (Outcome відображає підсумок саме того, що могло статися). Дає
+  ортогональні розрізи: можна aborted+success (аборт перед тим, як виріб встиг
+  зробити свою справу — рідкий, але можливий) і aborted+lost (виріб втрачено
+  під час підготовки).
+- **ADR-013 (Wave 2)** — мета-KPI рахуються «на льоту» (без матеріалізованих
+  view). *Чому:* при наявному масштабі (десятки тисяч подій, сотні кейсів)
+  агрегати робляться за <100 мс; матеріалізація додасть інваріантів і
+  буде окремою задачею Wave 4 (production scale).
 
 ---
 
 ## 7. Roadmap наступних хвиль
 
-**Хвиля 2 — Виміряти саме навчання (2–3 дні роботи)**
-- Дашборд мета-KPI: time-to-validation, % LI→LL, recurrence rate, OPR-навантаження
-- Розрізнення MSR-narrow / MSR-full (поле `aborted` на UsageEvent)
-- Cost-per-effect
-- UI для transitions (кнопки в CasesPage)
-- LL-flywheel віджети на головному dashboard
+**Хвиля 2 — Виміряти саме навчання — ✅ ЗАВЕРШЕНА (поточний реліз)**
+- ✅ Дашборд мета-KPI: time-to-validation, % LI→LL, recurrence rate, OPR-навантаження
+- ✅ Розрізнення MSR-narrow / MSR-full (поле `aborted` на UsageEvent)
+- ✅ Cost-per-effect
+- ✅ UI для transitions (кнопки в CasesPage) — зроблено у Wave 1
+- ⚠ LL-flywheel віджети на головному dashboard — flywheel винесено в окрему
+  сторінку `/learning-loop`. На головному `/` поки немає — буде у Wave 2.5
+  якщо буде попит (зараз окрема сторінка дає більше місця і це чіткіше).
 
 **Хвиля 3 — Культура і поширення (3–5 днів)**
 - Неатрибутивний режим (RBAC-toggle на видимість originator)

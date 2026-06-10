@@ -89,6 +89,11 @@ class AARCase(Base):
     opened_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # Wave 2: stamped on transition to VALIDATED. Lets the learning-loop
+    # service compute median time_to_validation = validated_at - opened_at.
+    validated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 

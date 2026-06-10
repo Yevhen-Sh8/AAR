@@ -1,6 +1,7 @@
+from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import Enum, Integer, String
+from sqlalchemy import Enum, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aar_api.core.db import Base
@@ -18,6 +19,9 @@ class ItemType(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     code: Mapped[str] = mapped_column(String(16), unique=True, index=True)
     name_uk: Mapped[str] = mapped_column(String(255))
+    # Wave 2: USD unit cost feeds cost-per-effect metric.
+    # NULL means cost unknown; the metric skips those records.
+    unit_cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
 
 
 class Operator(Base):
