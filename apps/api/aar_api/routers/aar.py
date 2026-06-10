@@ -26,9 +26,17 @@ from aar_api.schemas.aar import (
     RecommendationIn,
     RecommendationOut,
     RecommendationStatusUpdate,
+    ReportRequestIn,
+    ReportRequestSummary,
     TriggerResult,
 )
 from aar_api.services.audit import append as audit_append
+from aar_api.services.notifications import (
+    notify_case_closed,
+    notify_case_created,
+    notify_case_transitioned,
+    notify_report_requested,
+)
 from aar_api.services.triggers import TriggerConfig, evaluate_triggers
 
 router = APIRouter(prefix="/aar", tags=["aar"])
@@ -69,6 +77,7 @@ async def create_case(
         entity_id=case.id,
         payload={"title": case.title, "trigger": case.trigger.value},
     )
+    await notify_case_created(session, case)
     await session.commit()
     await session.refresh(case)
     return case
@@ -162,6 +171,9 @@ async def transition_case(
         entity_id=case.id,
         payload={"from": prev.value, "to": target.value, "note": payload.note},
     )
+    await notify_case_transitioned(session, case, prev.value, payload.note)
+    if target == CaseStatus.CLOSED:
+        await notify_case_closed(session, case)
     await session.commit()
     await session.refresh(case)
     return case
@@ -181,6 +193,7 @@ async def close_case(case_id: int, session: AsyncSession = Depends(get_session))
         entity_id=case.id,
         payload={"title": case.title},
     )
+    await notify_case_closed(session, case)
     await session.commit()
     await session.refresh(case)
     return case
@@ -194,12 +207,92 @@ async def add_report(
     payload: IndividualReportIn,
     session: AsyncSession = Depends(get_session),
 ) -> IndividualReport:
+    """Submit an individual AAR report.
+
+    If `request_id` points to an existing pending request stub, that row is
+    filled in (preserving `requested_at`). Otherwise a new row is created.
+    `anonymous=True` keeps `user_id` null in API responses but the audit
+    chain still records the originator via /audit.
+    """
     await _get_case(session, case_id)
-    report = IndividualReport(case_id=case_id, **payload.model_dump())
+    now = datetime.now(UTC)
+    data = payload.model_dump(exclude={"request_id"})
+
+    if payload.request_id is not None:
+        stub = await session.get(IndividualReport, payload.request_id)
+        if stub is None or stub.case_id != case_id:
+            raise HTTPException(404, "report request not found for this case")
+        if stub.submitted_at is not None:
+            raise HTTPException(409, "report already submitted")
+        for k, v in data.items():
+            setattr(stub, k, v)
+        stub.submitted_at = now
+        if payload.anonymous:
+            stub.user_id = None
+        await session.commit()
+        await session.refresh(stub)
+        return stub
+
+    report = IndividualReport(case_id=case_id, submitted_at=now, **data)
+    if payload.anonymous:
+        report.user_id = None
     session.add(report)
     await session.commit()
     await session.refresh(report)
     return report
+
+
+@router.post(
+    "/cases/{case_id}/request-reports",
+    response_model=ReportRequestSummary,
+    status_code=201,
+)
+async def request_reports(
+    case_id: int,
+    payload: ReportRequestIn,
+    session: AsyncSession = Depends(get_session),
+) -> ReportRequestSummary:
+    """Manager-side workflow: ask N participants to submit individual reports.
+
+    Creates one pending IndividualReport stub per user (or skips users that
+    already have a pending request for this case). Dispatches a webhook
+    `individual_report.requested` for each new stub so downstream messengers
+    can notify the user.
+    """
+    await _get_case(session, case_id)
+    now = datetime.now(UTC)
+
+    existing_rows = list(
+        await session.scalars(
+            select(IndividualReport).where(
+                IndividualReport.case_id == case_id,
+                IndividualReport.requested_for_user_id.in_(payload.user_ids),
+                IndividualReport.submitted_at.is_(None),
+            )
+        )
+    )
+    existing_for = {r.requested_for_user_id for r in existing_rows}
+
+    created: list[IndividualReport] = []
+    skipped = 0
+    for uid in payload.user_ids:
+        if uid in existing_for:
+            skipped += 1
+            continue
+        stub = IndividualReport(
+            case_id=case_id, requested_for_user_id=uid, requested_at=now
+        )
+        session.add(stub)
+        created.append(stub)
+    await session.flush()
+    for stub in created:
+        await notify_report_requested(session, stub)
+    await session.commit()
+    return ReportRequestSummary(
+        requested_count=len(created),
+        skipped_existing=skipped,
+        pending_report_ids=[r.id for r in created],
+    )
 
 
 @router.get("/cases/{case_id}/reports", response_model=list[IndividualReportOut])

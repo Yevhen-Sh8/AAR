@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aar_api.models.aar import Recommendation, RecommendationStatus
 from aar_api.models.audit import AuditAction
 from aar_api.services.audit import append as audit_append
+from aar_api.services.notifications import notify_recommendation_auto_validated
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,7 @@ async def auto_validate_recommendations(
                     "quiet_days": cfg.quiet_window_days,
                 },
             )
+            await notify_recommendation_auto_validated(session, rec)
             auto_validated.append(rec.id)
 
     return auto_validated, regressed

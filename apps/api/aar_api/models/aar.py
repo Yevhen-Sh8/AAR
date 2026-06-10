@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aar_api.core.db import Base
@@ -98,18 +98,37 @@ class AARCase(Base):
 
 
 class IndividualReport(Base):
+    """Per-participant AAR report. Supports both flows:
+
+    Pending-request: a manager asks N users for a report → N stub rows are
+    created with `requested_at` set, `user_id`/`submitted_at` null. The user
+    later fills them in.
+
+    Anonymous submission (TC 25-20 culture): when `anonymous=True`, the
+    response API redacts `user_id` to viewers without admin role, but the
+    audit chain still records the originator. This preserves blame-free
+    capture without losing the audit trail.
+    """
+
     __tablename__ = "individual_reports"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     case_id: Mapped[int] = mapped_column(ForeignKey("aar_cases.id"), index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    requested_for_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    anonymous: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     what_happened: Mapped[str | None] = mapped_column(Text, nullable=True)
     what_worked: Mapped[str | None] = mapped_column(Text, nullable=True)
     what_failed: Mapped[str | None] = mapped_column(Text, nullable=True)
     why: Mapped[str | None] = mapped_column(Text, nullable=True)
     external_factors: Mapped[str | None] = mapped_column(Text, nullable=True)
     what_to_change: Mapped[str | None] = mapped_column(Text, nullable=True)
-    submitted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+    requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 
@@ -146,19 +165,7 @@ class Recommendation(Base):
     signature: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
 
-class KnowledgeEntry(Base):
-    """Legacy v1.0 LL store. Superseded by ContextAsset (v1.1).
-
-    Kept for migration safety; not written to by current code. See ADR-007.
-    """
-
-    __tablename__ = "knowledge_entries"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    title: Mapped[str] = mapped_column(String(255))
-    content: Mapped[str] = mapped_column(Text)
-    source_case_id: Mapped[int | None] = mapped_column(
-        ForeignKey("aar_cases.id"), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+# KnowledgeEntry was removed in Wave 3 (migration 0009). It was the legacy v1.0
+# Lessons Learned store, fully superseded by ContextAsset (v1.1 CAL). The old
+# model was orphan code — no router wrote to it — and confused agents reading
+# the codebase. See ADR-014.

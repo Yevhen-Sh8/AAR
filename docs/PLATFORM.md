@@ -7,7 +7,7 @@
 > впливає на поведінку системи. Якщо ти агент — починай тут.
 
 **Останнє оновлення:** 2026-06-10
-**Поточна версія:** v1.1 (Context Accumulation Layer) + Wave 1 (NATO LL cycle) + Wave 2 (Learning-loop KPIs)
+**Поточна версія:** v1.1 + Waves 1–3 (NATO cycle, learning-loop KPIs, culture & dissemination)
 **Активна гілка розробки:** `claude/equipment-tracking-system-3lB6U`
 **Жива демо-версія:** https://yevhen-sh8.github.io/AAR/
 
@@ -222,6 +222,31 @@ launched-pool. Для повної інтерпретації див. `docs/metr
   median, LI→LL pct, recurrence pct, MSR narrow vs full, cost-per-effect,
   OPR grouping.
 
+### Wave 3 — Культура і поширення
+- Міграція 0009: `individual_reports` отримує `anonymous` (bool),
+  `requested_at`, `requested_for_user_id`; `user_id` і `submitted_at`
+  стають nullable (одна модель тепер описує і запит, і подання). Таблиця
+  `knowledge_entries` видалена як рудимент (ADR-014).
+- Новий ендпойнт `POST /aar/cases/{id}/request-reports` — менеджер задає
+  список user_ids → створюються pending-стаби, дублі пропускаються,
+  webhook `individual_report.requested` шле зовнішнім системам.
+- Розширений `POST /aar/cases/{id}/reports` — підтримує `request_id`
+  (заповнення стаба) і `anonymous=true` (зануляє user_id у відповіді,
+  audit-ланцюг зберігає originator — TC 25-20 blame-free).
+- `services/notifications.py` — централізована точка для outbound
+  webhook'ів. Викликається з: створення кейсу, transition, auto-validation
+  рекомендації, запит звіту. Помилки доставки не блокують бізнес-операцію.
+- Розширений `WebhookEventKind`: `aar_case.transitioned`,
+  `recommendation.auto_validated`, `individual_report.requested`.
+- UI `CasesPage`: блок «Індивідуальні звіти учасників» — лічильник
+  submitted/pending, поле для розсилки запитів через user_ids, таблиця
+  звітів з позначкою «анонімно» для anonymous=true.
+- Тести: `test_wave3_culture.py` (6 кейсів) — створення pending stubs,
+  ідемпотентність повторного запиту, заповнення стаба при подачі,
+  anonymous redaction, webhook on case-created і case-transitioned,
+  list pending reports. Також додано регресійний тест ADR-009
+  (`test_analogies_searches_only_validated_assets`).
+
 ---
 
 ## 5. Що НЕ зроблено і чому
@@ -265,6 +290,18 @@ launched-pool. Для повної інтерпретації див. `docs/metr
   view). *Чому:* при наявному масштабі (десятки тисяч подій, сотні кейсів)
   агрегати робляться за <100 мс; матеріалізація додасть інваріантів і
   буде окремою задачею Wave 4 (production scale).
+- **ADR-014 (Wave 3)** — модель `KnowledgeEntry` видалена. *Чому:* v1.1 CAL
+  (`ContextAsset`) повністю її заміщує; жоден router у v1.1 не пише в стару
+  таблицю. Залишати мертвий код = плутати агентів і додавати maintenance cost.
+- **ADR-015 (Wave 3)** — анонімність зберігається в API-відповіді (user_id=null),
+  але audit-ланцюг тримає originator. *Чому:* TC 25-20 культура вимагає,
+  щоб учасник довіряв системі; одночасно адмін має право розслідувати
+  зловживання (фейкові звіти). Двошарова видимість.
+- **ADR-016 (Wave 3)** — pending-request і submitted-report — це одна модель
+  з двома станами (`submitted_at` null/не-null), а не дві окремі сутності.
+  *Чому:* життєвий цикл «запросили → людина подала» — це той самий
+  семантичний об'єкт; розділення на дві моделі породжує синхронізацію
+  без виграшу в моделюванні.
 
 ---
 
@@ -279,12 +316,13 @@ launched-pool. Для повної інтерпретації див. `docs/metr
   сторінку `/learning-loop`. На головному `/` поки немає — буде у Wave 2.5
   якщо буде попит (зараз окрема сторінка дає більше місця і це чіткіше).
 
-**Хвиля 3 — Культура і поширення (3–5 днів)**
-- Неатрибутивний режим (RBAC-toggle на видимість originator)
-- Розсилка `IndividualReport` форм учасникам (push/email/messenger)
-- Webhook на messenger при відкритті кейсу та при auto-validation
-- Bulk-imports інтерфейс
-- Видалити рудимент `KnowledgeEntry`
+**Хвиля 3 — Культура і поширення — ✅ ЗАВЕРШЕНА (поточний реліз)**
+- ✅ Неатрибутивний режим (anonymous flag з audit-збереженням originator)
+- ✅ Розсилка форм учасникам (request-reports workflow з ідемпотентністю)
+- ✅ Webhook'и на події кейсів і auto-validation
+- ⚠ Bulk-imports інтерфейс окремого UI для звітів немає — для подій
+  існує `/import`. Якщо буде потреба — додамо у Wave 5.
+- ✅ Видалено рудимент `KnowledgeEntry`
 
 **Хвиля 4 — Робочий додаток (production)**
 - Бекенд на Render/Fly з Postgres

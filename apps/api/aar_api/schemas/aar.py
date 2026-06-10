@@ -60,26 +60,43 @@ class AARCaseOut(_Base):
 
 
 class IndividualReportIn(BaseModel):
-    user_id: int
+    user_id: int | None = None
+    anonymous: bool = False
     what_happened: str | None = None
     what_worked: str | None = None
     what_failed: str | None = None
     why: str | None = None
     external_factors: str | None = None
     what_to_change: str | None = None
+    request_id: int | None = None  # fills in an existing stub if provided
 
 
 class IndividualReportOut(_Base):
     id: int
     case_id: int
-    user_id: int
+    user_id: int | None
+    requested_for_user_id: int | None
+    anonymous: bool
     what_happened: str | None
     what_worked: str | None
     what_failed: str | None
     why: str | None
     external_factors: str | None
     what_to_change: str | None
-    submitted_at: datetime
+    requested_at: datetime | None
+    submitted_at: datetime | None
+
+
+class ReportRequestIn(BaseModel):
+    """Manager-side: ask N participants to submit individual reports."""
+
+    user_ids: list[int]
+
+
+class ReportRequestSummary(BaseModel):
+    requested_count: int
+    skipped_existing: int
+    pending_report_ids: list[int]
 
 
 class RecommendationIn(BaseModel):

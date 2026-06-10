@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { FolderKanban, ArrowRight, Sparkles, Save } from "lucide-react";
+import { FolderKanban, ArrowRight, Sparkles, Save, UserPlus, EyeOff } from "lucide-react";
 import { apiFetch, IS_DEMO } from "../lib/api";
 
 interface AARCase {
@@ -19,6 +19,17 @@ interface AARCase {
   analysis_drafted_at: string | null;
   opened_at: string;
   closed_at: string | null;
+}
+
+interface CaseReport {
+  id: number;
+  user_id: number | null;
+  requested_for_user_id: number | null;
+  anonymous: boolean;
+  what_happened: string | null;
+  why: string | null;
+  requested_at: string | null;
+  submitted_at: string | null;
 }
 
 const STAGES = [
@@ -81,6 +92,7 @@ export default function CasesPage() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<AARCase | null>(null);
   const [draft, setDraft] = useState<Partial<AARCase>>({});
+  const [requestUserIds, setRequestUserIds] = useState("");
 
   const cases = useQuery({
     queryKey: ["cases-all"],
@@ -122,6 +134,25 @@ export default function CasesPage() {
         setDraft({ ...draft, analysis: data.markdown });
       }
       qc.invalidateQueries({ queryKey: ["cases-all"] });
+    },
+  });
+
+  const reports = useQuery({
+    queryKey: ["case-reports", selected?.id],
+    queryFn: () =>
+      apiFetch<CaseReport[]>(`/aar/cases/${selected!.id}/reports`),
+    enabled: !!selected,
+  });
+
+  const requestReports = useMutation({
+    mutationFn: (vars: { id: number; user_ids: number[] }) =>
+      apiFetch<{ requested_count: number; skipped_existing: number }>(
+        `/aar/cases/${vars.id}/request-reports`,
+        { method: "POST", body: JSON.stringify({ user_ids: vars.user_ids }) },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["case-reports"] });
+      setRequestUserIds("");
     },
   });
 
@@ -281,6 +312,95 @@ export default function CasesPage() {
               ⓘ Demo-режим: збереження і переходи не пишуться у БД.
             </p>
           )}
+
+          <div style={{ borderTop: "1px solid var(--border-muted)", marginTop: 24, paddingTop: 16 }}>
+            <div className="card-header">
+              <span className="card-title">
+                <UserPlus size={14} style={{ verticalAlign: "-2px", marginRight: 4 }} />
+                Індивідуальні звіти учасників
+              </span>
+              <span className="card-badge badge-blue">
+                {(reports.data ?? []).filter((r) => r.submitted_at).length} надано ·{" "}
+                {(reports.data ?? []).filter((r) => !r.submitted_at).length} очікує
+              </span>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <input
+                className="form-input"
+                placeholder="user_ids через кому, напр. 1,2,3"
+                value={requestUserIds}
+                onChange={(e) => setRequestUserIds(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button
+                onClick={() => {
+                  const ids = requestUserIds
+                    .split(",")
+                    .map((s) => parseInt(s.trim(), 10))
+                    .filter((n) => !isNaN(n));
+                  if (ids.length > 0) {
+                    requestReports.mutate({ id: current.id, user_ids: ids });
+                  }
+                }}
+                disabled={requestReports.isPending || IS_DEMO || !requestUserIds.trim()}
+              >
+                Розіслати запити
+              </button>
+            </div>
+
+            {(reports.data ?? []).length === 0 ? (
+              <div className="loading">Звітів немає — розішли запити учасникам.</div>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Від</th>
+                    <th>Що сталось</th>
+                    <th>Чому</th>
+                    <th>Стан</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(reports.data ?? []).map((r) => (
+                    <tr key={r.id}>
+                      <td className="mono">{r.id}</td>
+                      <td>
+                        {r.anonymous ? (
+                          <span style={{ color: "var(--accent-gold)" }}>
+                            <EyeOff size={12} style={{ verticalAlign: "-2px" }} /> анонімно
+                          </span>
+                        ) : r.user_id ? (
+                          <span className="mono">user #{r.user_id}</span>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)" }}>
+                            (запит #{r.requested_for_user_id})
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.what_happened ?? "—"}
+                      </td>
+                      <td style={{ maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {r.why ?? "—"}
+                      </td>
+                      <td>
+                        <span className={r.submitted_at ? "chip chip-active" : "chip chip-draft"}>
+                          {r.submitted_at ? "submitted" : "pending"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+              Учасник може подати звіт анонімно — поле «Від» показуватиме «анонімно»,
+              але audit-ланцюг збереже originator для адміна (TC 25-20).
+            </p>
+          </div>
         </div>
       )}
     </div>
