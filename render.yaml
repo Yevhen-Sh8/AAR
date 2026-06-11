@@ -55,10 +55,11 @@ services:
         sync: false
 
   # ─────────────────────── Web (React PWA, static) ─────────────────────────
+  # Note: static sites are free by default — Render rejects an explicit
+  # `plan` field here ("no such plan free for service type web").
   - type: web
     name: aar-web
     runtime: static
-    plan: free
     buildCommand: cd apps/web && npm ci && VITE_API_BASE="https://${AAR_API_HOST}/api" npm run build
     staticPublishPath: apps/web/dist
     pullRequestPreviewsEnabled: false
