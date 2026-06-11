@@ -11,8 +11,12 @@ COPY pyproject.toml ./
 COPY aar_api ./aar_api
 COPY alembic ./alembic
 COPY alembic.ini ./
-RUN pip install --no-cache-dir -e .
+COPY start.sh ./
+RUN pip install --no-cache-dir -e . \
+ && chmod +x start.sh \
+ && chown -R app:app /app
 
 USER app
 EXPOSE 8000
-CMD ["uvicorn", "aar_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Entrypoint runs migrations (+ optional seed) then starts uvicorn on $PORT.
+CMD ["./start.sh"]

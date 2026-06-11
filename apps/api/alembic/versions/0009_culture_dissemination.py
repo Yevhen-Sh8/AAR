@@ -25,9 +25,23 @@ down_revision: Union[str, None] = "0008_learning_kpi"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+# The nullability changes below force SQLite's batch mode to recreate the table
+# and copy its existing (unnamed) foreign keys, which fails without names. A
+# naming convention lets the reflected constraints be named during the copy.
+# On Postgres (production) batch mode runs direct ALTERs and this is a no-op.
+NAMING_CONVENTION = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+
 
 def upgrade() -> None:
-    with op.batch_alter_table("individual_reports") as batch:
+    with op.batch_alter_table(
+        "individual_reports", naming_convention=NAMING_CONVENTION
+    ) as batch:
         batch.add_column(
             sa.Column("anonymous", sa.Boolean(), nullable=False, server_default=sa.false())
         )
@@ -36,7 +50,10 @@ def upgrade() -> None:
             sa.Column(
                 "requested_for_user_id",
                 sa.Integer(),
-                sa.ForeignKey("users.id"),
+                sa.ForeignKey(
+                    "users.id",
+                    name="fk_individual_reports_requested_for_user_id_users",
+                ),
                 nullable=True,
             )
         )
@@ -61,7 +78,9 @@ def downgrade() -> None:
         ),
     )
 
-    with op.batch_alter_table("individual_reports") as batch:
+    with op.batch_alter_table(
+        "individual_reports", naming_convention=NAMING_CONVENTION
+    ) as batch:
         batch.alter_column("submitted_at", existing_type=sa.DateTime(timezone=True), nullable=False)
         batch.alter_column("user_id", existing_type=sa.Integer(), nullable=False)
         batch.drop_column("requested_for_user_id")

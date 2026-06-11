@@ -7,9 +7,10 @@
 > впливає на поведінку системи. Якщо ти агент — починай тут.
 
 **Останнє оновлення:** 2026-06-10
-**Поточна версія:** v1.1 + Waves 1–3 (NATO cycle, learning-loop KPIs, culture & dissemination)
+**Поточна версія:** v1.1 + Waves 1–4 (NATO cycle, learning-loop KPIs, culture & dissemination, production deploy)
 **Активна гілка розробки:** `claude/equipment-tracking-system-3lB6U`
 **Жива демо-версія:** https://yevhen-sh8.github.io/AAR/
+**Робочий деплой (як підняти):** `docs/DEPLOY.md` (Render Blueprint, ~5 хв)
 
 ---
 
@@ -247,19 +248,43 @@ launched-pool. Для повної інтерпретації див. `docs/metr
   list pending reports. Також додано регресійний тест ADR-009
   (`test_analogies_searches_only_validated_assets`).
 
+### Wave 4 — Робочий деплой (production)
+- `render.yaml` (корінь) — Render Blueprint: безкоштовний Postgres + API
+  (Docker) + Web (статика) одним кліком у браузері. Деталі — `docs/DEPLOY.md`.
+- `apps/api/start.sh` — entrypoint контейнера: `alembic upgrade head` →
+  ідемпотентний seed (за `AAR_SEED_ON_START`) → `uvicorn` на `$PORT`.
+  Платформонезалежний (Render/Fly/Railway).
+- `core/config.py` — нормалізація БД-URL: `postgres://`/`postgresql://` →
+  `postgresql+asyncpg://` (+ зрізання `?sslmode=` для asyncpg). CORS тепер з
+  env: `AAR_CORS_ORIGINS` (список) + `AAR_CORS_ORIGIN_REGEX` (для
+  `*.onrender.com`). Прапор `AAR_SEED_ON_START`.
+- `main.py` — CORS будується з налаштувань (origins + optional regex).
+- `Dockerfile` (API) — копіює `start.sh`, ставить його як CMD, виставляє
+  права; слухає `$PORT`.
+- Фронтенд live-режим: `apps/web/src/lib/api.ts` читає `VITE_API_BASE` —
+  абсолютний URL бекенду (Render зашиває його в бандл під час білду). Default
+  лишається `/api` (nginx/vite-proxy).
+- CI: нова джоба `migrations` — `alembic upgrade head` на чистій БД +
+  downgrade→upgrade roundtrip. Ловить клас багів, який тести (create_all)
+  не бачать.
+- Тести: `test_config_prod.py` (6 кейсів) — нормалізація postgres-URL,
+  asyncpg-драйвер, sqlite без змін, зрізання sslmode, CORS-список.
+- **Знайдено й виправлено до деплою:** міграція 0009 на SQLite падала
+  (`batch_alter_table` + зміна nullability → recreate таблиці з безіменними
+  FK). Виправлено `naming_convention` у batch (на Postgres — no-op).
+
 ---
 
 ## 5. Що НЕ зроблено і чому
 
 | Робота | Стан | Чому відкладено |
 |---|---|---|
-| Workflow-двигун розсилки індивідуальних форм | планується (Wave 3) | Потребує черги + інтеграції з messenger; не блокує методологію |
-| Дашборд мета-KPI циклу навчання (time-to-validation, recurrence rate) | планується (Wave 2) | Дані вже накопичуються в полях; UI — окрема порція |
-| Уточнення MSR (вузький vs повний знаменник) | планується (Wave 2) | Потребує додавання поля `aborted` в UsageEvent — публічна зміна моделі |
-| Cost-per-effect метрика | планується (Wave 2) | Потребує вартісних довідників |
-| Неатрибутивний режим (TC 25-20 культура) | планується (Wave 3) | Дизайн RBAC уже підтримує; треба UI-toggle |
-| Бекенд на хостингу для робочого додатку (не demo) | відкладено | Користувач вирішив поки лишити demo (Render/Fly/Railway — на потім) |
-| Live integrations з DELTA/Kropyva | поза MVP | Потребує продуктивних ключів і нормативного дозволу |
+| Реальний messenger-канал нотифікацій (Telegram/Signal) | планується | Webhook-шар готовий (Wave 3); треба лише конкретний адаптер-приймач |
+| Шифрування at-rest / backup-drill / ротація секретів | планується (Wave 5) | Інфраструктурні рішення прод-контуру; залежать від середовища замовника |
+| Live integrations з DELTA/Kropyva (реальні ключі) | поза MVP | Потребує продуктивних ключів і нормативного дозволу |
+| Code-splitting фронт-бандла (зараз ~658 KB) | бэклог | Працює; оптимізація не блокує функціонал |
+| Геопросторовий шар (карта подій) | наступна мінорна | GeoJSON у моделі вже є; треба UI-карта |
+| Матеріалізовані view для KPI (prod scale) | Wave 5 | На поточному масштабі агрегати < 100 мс (ADR-013) |
 
 ---
 
@@ -302,6 +327,16 @@ launched-pool. Для повної інтерпретації див. `docs/metr
   *Чому:* життєвий цикл «запросили → людина подала» — це той самий
   семантичний об'єкт; розділення на дві моделі породжує синхронізацію
   без виграшу в моделюванні.
+- **ADR-017 (Wave 4)** — один `AAR_DATABASE_URL` для всіх середовищ;
+  нормалізація драйвера в `config.py`, а не різні env для async/sync.
+  *Чому:* керовані хостинги (Render/Heroku/Railway) дають `postgres://` без
+  драйвера; зводимо до `postgresql+asyncpg://` в одному місці, Alembic зрізає
+  `+asyncpg` для sync. Менше конфіг-дрейфу між dev/prod.
+- **ADR-018 (Wave 4)** — фронтенд на проді — окремий статичний сайт із
+  абсолютним `VITE_API_BASE`, а не реверс-проксі перед бекендом. *Чому:* CDN
+  безкоштовний і не засинає; API `root_path="/api"` приймає префікс, тож
+  абсолютний `…/api/...` працює; CORS-regex для `*.onrender.com` знімає
+  крихкість іменування сервісів.
 
 ---
 
@@ -324,11 +359,19 @@ launched-pool. Для повної інтерпретації див. `docs/metr
   існує `/import`. Якщо буде потреба — додамо у Wave 5.
 - ✅ Видалено рудимент `KnowledgeEntry`
 
-**Хвиля 4 — Робочий додаток (production)**
-- Бекенд на Render/Fly з Postgres
-- TLS, secrets-vault, JWT-rotation
-- Резервне копіювання + restore-drill
-- Pilot у однієї військової частини
+**Хвиля 4 — Робочий деплой — ✅ ЗАВЕРШЕНА (поточний реліз)**
+- ✅ Бекенд на Render/Fly з Postgres — `render.yaml` Blueprint + `docs/DEPLOY.md`
+- ✅ Self-migrate + idempotent seed на старті контейнера (`start.sh`)
+- ✅ Env-driven CORS + нормалізація БД-URL + live-режим фронтенду
+- ✅ CI-джоба міграцій (fresh-DB upgrade + roundtrip)
+- ⚠ TLS/secrets-vault/JWT-rotation/backup-drill — Render дає TLS і
+  generated-secret «з коробки»; повний прод-контур безпеки = Wave 5
+- ☐ Pilot у однієї військової частини — потребує рішення замовника
+
+**Хвиля 5 — Прод-загартування (за потреби)**
+- Шифрування at-rest, backup + restore-drill, JWT-rotation, приватна мережа
+- Реальний messenger-канал (Telegram/Signal) поверх webhook-шару
+- Матеріалізовані view для KPI; code-splitting фронту; геокарта
 
 ---
 
@@ -345,6 +388,8 @@ launched-pool. Для повної інтерпретації див. `docs/metr
 | Як влаштовано audit-chain | `apps/api/aar_api/services/audit.py` |
 | Як виглядає UI-сторінка | `apps/web/src/pages/<ім'я>.tsx` |
 | Як працює demo-режим | `apps/web/src/lib/api.ts` (DEMO + MOCK_ROUTES) |
+| Як працює live-режим (прод) | `apps/web/src/lib/api.ts` (`VITE_API_BASE`) |
+| Як підняти робочий додаток | `docs/DEPLOY.md` + `render.yaml` + `apps/api/start.sh` |
 | Як bootstrapнути локально | `CLAUDE.md` § Build & Test Commands |
 
 ---

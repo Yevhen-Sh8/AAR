@@ -23,6 +23,30 @@ jobs:
       - run: mypy aar_api
       - run: pytest -q
 
+  migrations:
+    name: Migrations (fresh DB)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: alembic upgrade head applies cleanly on an empty DB
+        env:
+          AAR_DATABASE_URL: sqlite+aiosqlite:///./ci_migrations.db
+        run: alembic upgrade head
+      - name: full downgrade then upgrade round-trips
+        env:
+          AAR_DATABASE_URL: sqlite+aiosqlite:///./ci_migrations.db
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+
   audit:
     name: pip-audit (deps CVE scan)
     runs-on: ubuntu-latest

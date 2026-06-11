@@ -24,14 +24,15 @@ if settings.environment != "development" and settings.jwt_secret == "change-me-i
 
 app = FastAPI(title=settings.app_name, version=__version__, root_path="/api")
 
-allowed = ["http://localhost:5173", "http://localhost:8080"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_kwargs: dict = {
+    "allow_origins": settings.cors_origin_list,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+if settings.cors_origin_regex:
+    cors_kwargs["allow_origin_regex"] = settings.cors_origin_regex
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 app.include_router(health.router)
 app.include_router(dictionaries.router)

@@ -1,5 +1,11 @@
 const DEMO = import.meta.env.VITE_DEMO === "true";
-const BASE = DEMO ? `${import.meta.env.BASE_URL}mock` : "/api";
+
+// Live API base resolution:
+//   - demo build        → static mock JSON under <base>/mock
+//   - VITE_API_BASE set  → absolute backend URL (e.g. https://aar-api.onrender.com/api)
+//   - otherwise          → same-origin "/api" (nginx proxy / vite dev proxy)
+const LIVE_BASE = import.meta.env.VITE_API_BASE || "/api";
+const BASE = DEMO ? `${import.meta.env.BASE_URL}mock` : LIVE_BASE;
 
 const MOCK_ROUTES: Record<string, string> = {
   "/reports/monthly": "/monthly.json",
