@@ -24,14 +24,21 @@ if settings.environment != "development" and settings.jwt_secret == "change-me-i
 
 app = FastAPI(title=settings.app_name, version=__version__, root_path="/api")
 
-cors_kwargs: dict = {
-    "allow_origins": settings.cors_origin_list,
-    "allow_credentials": True,
-    "allow_methods": ["*"],
-    "allow_headers": ["*"],
-}
-if settings.cors_origin_regex:
-    cors_kwargs["allow_origin_regex"] = settings.cors_origin_regex
+# CORS. The API carries no cookies (auth is header-based JWT), so when the
+# allow-list is "*" we can safely echo `*` with credentials disabled — this
+# is the bullet-proof setting for a split-origin deploy (web ≠ api host) and
+# sidesteps any regex/host-matching fragility. Restrict to explicit origins
+# for a hardened deployment by setting AAR_CORS_ORIGINS to real hosts.
+origins = settings.cors_origin_list
+cors_kwargs: dict = {"allow_methods": ["*"], "allow_headers": ["*"]}
+if "*" in origins:
+    cors_kwargs["allow_origins"] = ["*"]
+    cors_kwargs["allow_credentials"] = False
+else:
+    cors_kwargs["allow_origins"] = origins
+    cors_kwargs["allow_credentials"] = True
+    if settings.cors_origin_regex:
+        cors_kwargs["allow_origin_regex"] = settings.cors_origin_regex
 app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 app.include_router(health.router)

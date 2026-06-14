@@ -42,12 +42,11 @@ services:
         value: production
       - key: AAR_SEED_ON_START
         value: "true"
+      # Pilot setting: allow all origins (API is cookie-free, header-auth only),
+      # so the split-origin web↔api deploy works without host/regex fragility.
+      # Tighten to explicit hosts for a hardened deployment.
       - key: AAR_CORS_ORIGINS
-        value: https://yevhen-sh8.github.io
-      # Permit any *.onrender.com host (the static frontend + PR previews),
-      # so the deploy works even if Render appends a name suffix.
-      - key: AAR_CORS_ORIGIN_REGEX
-        value: https://.*\.onrender\.com
+        value: "*"
       - key: AAR_LLM_ENABLED
         value: "false"
       # Set this in the dashboard to turn on AI drafting/classification.

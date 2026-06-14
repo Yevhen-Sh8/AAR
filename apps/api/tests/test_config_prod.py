@@ -30,3 +30,27 @@ def test_sslmode_query_stripped_for_asyncpg() -> None:
 def test_cors_origin_list_splits_and_trims() -> None:
     s = Settings(cors_origins="https://a.com, https://b.com ,")
     assert s.cors_origin_list == ["https://a.com", "https://b.com"]
+
+
+def test_cors_wildcard_parsed() -> None:
+    s = Settings(cors_origins="*")
+    assert s.cors_origin_list == ["*"]
+
+
+def test_cors_preflight_allows_origin() -> None:
+    """The running app (default test config) answers a CORS preflight with an
+    Access-Control-Allow-Origin header — proves the middleware is wired."""
+    from starlette.testclient import TestClient
+
+    from aar_api.main import app
+
+    client = TestClient(app)
+    r = client.options(
+        "/events",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert r.status_code in (200, 204)
+    assert "access-control-allow-origin" in {k.lower() for k in r.headers}
