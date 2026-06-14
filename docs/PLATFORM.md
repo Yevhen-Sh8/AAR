@@ -7,7 +7,7 @@
 > впливає на поведінку системи. Якщо ти агент — починай тут.
 
 **Останнє оновлення:** 2026-06-10
-**Поточна версія:** v1.1 + Waves 1–4 (NATO cycle, learning-loop KPIs, culture & dissemination, production deploy)
+**Поточна версія:** v1.1 + Waves 1–5 (… + authentication & hardening)
 **Активна гілка розробки:** `claude/equipment-tracking-system-3lB6U`
 **Жива демо-версія:** https://yevhen-sh8.github.io/AAR/
 **Робочий деплой (як підняти):** `docs/DEPLOY.md` (Render Blueprint, ~5 хв)
@@ -272,6 +272,30 @@ launched-pool. Для повної інтерпретації див. `docs/metr
 - **Знайдено й виправлено до деплою:** міграція 0009 на SQLite падала
   (`batch_alter_table` + зміна nullability → recreate таблиці з безіменними
   FK). Виправлено `naming_convention` у batch (на Postgres — no-op).
+
+### Wave 5 — Автентифікація і прод-загартування
+- `POST /auth/login` (`routers/auth.py`) — обмін email+пароль на JWT;
+  email case-insensitive; однакова помилка на «немає юзера» і «невірний
+  пароль» (не зливаємо існування акаунтів).
+- `GET /auth/me` — поточний користувач для UI.
+- Глобальний auth-gate як HTTP middleware у `main.py`: у `production`
+  будь-який шлях, окрім невеликого allow-list (`/`, `/auth/login`, `/health/*`,
+  `/docs`, `/redoc`, `/openapi.json`), вимагає валідний Bearer-токен.
+  У `development` вимкнено, щоб тести/розробка лишались frictionless
+  (узгоджено з dev-bypass у `core/rbac.require_role`).
+- `core/security.py`: схема паролів змінена з `bcrypt` на `pbkdf2_sha256` —
+  чистий Python, без passlib↔bcrypt 4.x несумісностей (інакше падало і в
+  тестах, і в проді).
+- Сід-скрипт створює bootstrap-адміна з `AAR_ADMIN_EMAIL` /
+  `AAR_ADMIN_PASSWORD` (ідемпотентно — пропускає, якщо вже існує).
+- Фронтенд: `lib/auth.ts` (localStorage-сесія + подія `aar:unauthorized`);
+  `LoginPage` (екран входу); `App.tsx` рендерить логін, якщо не авторизований
+  і не demo-режим; сайдбар має «Вийти». `api.ts` і `sync.ts` ставлять
+  `Authorization: Bearer <token>` і на 401 чистять сесію та шлють на логін.
+- `render.yaml`: `AAR_ADMIN_EMAIL`/`AAR_ADMIN_PASSWORD` (sync:false для пароля).
+- Тести: `test_auth.py` (7) — login успіх/неуспіх/case-insensitive, `/me` з/без
+  токена, allow-list публічних шляхів, гейт блокує без токена в проді й
+  пропускає з токеном.
 
 ---
 

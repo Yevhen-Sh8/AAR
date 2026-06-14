@@ -12,8 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from aar_api.core.config import get_settings
+from aar_api.core.security import hash_password
 from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairReason, Zone
 from aar_api.models.event import Item, Outcome, UsageEvent
+from aar_api.models.user import Role, User
 
 ITEM_TYPES = [("A", "Виріб типу А"), ("B", "Виріб типу Б")]
 OPERATORS = [(f"E-{i:02d}", f"Експлуатант {i:02d}") for i in range(1, 11)]
@@ -109,11 +111,31 @@ async def _seed_events(session: AsyncSession, rng: random.Random) -> int:
     return created
 
 
+async def _seed_admin(session: AsyncSession) -> None:
+    """Create the bootstrap admin from settings if it does not exist."""
+    s = get_settings()
+    email = s.admin_email.strip().lower()
+    existing = await session.scalar(select(User).where(User.email == email))
+    if existing is not None:
+        return
+    session.add(
+        User(
+            email=email,
+            full_name="Адміністратор",
+            hashed_password=hash_password(s.admin_password),
+            role=Role.ADMIN,
+        )
+    )
+    await session.flush()
+    print(f"Created bootstrap admin: {email}")
+
+
 async def main() -> None:
     engine = create_async_engine(get_settings().database_url)
     Session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
     rng = random.Random(42)
     async with Session() as session:
+        await _seed_admin(session)
         await _seed_dict(session, ItemType, ITEM_TYPES)
         await _seed_dict(session, Operator, OPERATORS)
         await _seed_dict(session, LossReason, LOSS_REASONS)

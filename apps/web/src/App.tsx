@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -13,10 +13,12 @@ import {
   Upload,
   BookOpen,
   Activity,
+  LogOut,
 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { installAutoSync } from "./lib/sync";
 import { IS_DEMO } from "./lib/api";
+import { clearSession, getEmail, isAuthed } from "./lib/auth";
 import Dashboard from "./pages/Dashboard";
 import EventsPage from "./pages/EventsPage";
 import EventForm from "./pages/EventForm";
@@ -29,6 +31,7 @@ import AuditPage from "./pages/AuditPage";
 import SettingsPage from "./pages/SettingsPage";
 import DictionariesPage from "./pages/DictionariesPage";
 import LearningLoopPage from "./pages/LearningLoopPage";
+import LoginPage from "./pages/LoginPage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -53,7 +56,7 @@ const NAV = [
   { to: "/settings", icon: Settings, label: "Налаштування" },
 ] as const;
 
-function Sidebar() {
+function Sidebar({ onLogout }: { onLogout: () => void }) {
   const { pathname } = useLocation();
   return (
     <nav className="sidebar">
@@ -90,16 +93,39 @@ function Sidebar() {
           </Link>
         ),
       )}
+      {!IS_DEMO && (
+        <button className="sidebar-logout" onClick={onLogout} title={getEmail() ?? ""}>
+          <LogOut size={18} />
+          Вийти{getEmail() ? ` (${getEmail()})` : ""}
+        </button>
+      )}
     </nav>
   );
 }
 
 export default function App() {
+  const [authed, setAuthed] = useState(IS_DEMO || isAuthed());
+
   useEffect(() => installAutoSync(), []);
+  useEffect(() => {
+    const onUnauth = () => setAuthed(false);
+    window.addEventListener("aar:unauthorized", onUnauth);
+    return () => window.removeEventListener("aar:unauthorized", onUnauth);
+  }, []);
+
+  function logout() {
+    clearSession();
+    setAuthed(false);
+  }
+
+  if (!IS_DEMO && !authed) {
+    return <LoginPage onLogin={() => setAuthed(true)} />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="app">
-        <Sidebar />
+        <Sidebar onLogout={logout} />
         <main className="main">
           <Routes>
             <Route path="/" element={<Dashboard />} />

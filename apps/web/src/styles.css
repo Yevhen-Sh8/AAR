@@ -482,6 +482,89 @@ button.icon-btn:hover { color: var(--accent-red); }
   padding: 20px;
 }
 
+/* ───── Login screen ───── */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-root);
+  padding: 20px;
+}
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.login-logo {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent-gold);
+  letter-spacing: 3px;
+  text-align: center;
+}
+.login-sub {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.login-field input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.login-field input:focus { outline: 1px solid var(--accent-gold); }
+.login-error {
+  background: var(--accent-red-muted);
+  color: var(--accent-red);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 11px;
+  font-size: 15px;
+}
+.sidebar-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 12px 0;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-logout:hover { color: var(--accent-red); border-color: var(--accent-red); }
+
 /* ───── NATO LL cycle UI ───── */
 .stage-columns {
   display: grid;

@@ -49,6 +49,11 @@ services:
         value: "*"
       - key: AAR_LLM_ENABLED
         value: "false"
+      # Bootstrap admin: seeded on first start. CHANGE BEFORE PILOT.
+      - key: AAR_ADMIN_EMAIL
+        value: admin@aar.local
+      - key: AAR_ADMIN_PASSWORD
+        sync: false
       # Set this in the dashboard to turn on AI drafting/classification.
       - key: AAR_ANTHROPIC_API_KEY
         sync: false

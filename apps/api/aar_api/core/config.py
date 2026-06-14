@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     llm_fast_model: str = "claude-haiku-4-5"
     llm_enabled: bool = False
 
+    # Bootstrap admin — seeded on first start if absent. Override in prod.
+    admin_email: str = "admin@aar.local"
+    admin_password: str = "aar-admin-2026"
+
     # When true, the container entrypoint seeds synthetic demo data on first
     # boot (idempotent — skips if events already exist).
     seed_on_start: bool = False

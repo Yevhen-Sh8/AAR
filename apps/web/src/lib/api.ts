@@ -1,3 +1,5 @@
+import { clearSession, emitUnauthorized, getToken } from "./auth";
+
 const DEMO = import.meta.env.VITE_DEMO === "true";
 
 // Live API base resolution:
@@ -57,10 +59,21 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     return [] as T; // demo is read-only — POST/PATCH return empty
   }
 
+  const token = DEMO ? null : getToken();
   const resp = await fetch(url, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
+  if (resp.status === 401 && !DEMO) {
+    // Token missing/expired → drop session and bounce to login.
+    clearSession();
+    emitUnauthorized();
+    throw new Error("401: потрібен вхід");
+  }
   if (!resp.ok) throw new Error(`API ${resp.status}: ${await resp.text()}`);
   return resp.json() as Promise<T>;
 }
