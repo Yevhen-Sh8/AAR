@@ -1,5 +1,5 @@
 import { Settings as SettingsIcon, ExternalLink } from "lucide-react";
-import { IS_DEMO } from "../lib/api";
+import { API_BASE, IS_DEMO } from "../lib/api";
 
 const APP_VERSION = "0.4.0";
 
@@ -30,7 +30,8 @@ function stateChip(s: string): string {
 export default function SettingsPage() {
   const env = {
     "Build mode": IS_DEMO ? "demo (read-only)" : "live (full API)",
-    "API base": IS_DEMO ? `${import.meta.env.BASE_URL}mock` : "/api",
+    "API base": IS_DEMO ? `${import.meta.env.BASE_URL}mock` : API_BASE,
+    "VITE_API_BASE (build var)": import.meta.env.VITE_API_BASE || "(not set → /api)",
     "App version": APP_VERSION,
     "Base URL": import.meta.env.BASE_URL,
     "Build env": import.meta.env.MODE,

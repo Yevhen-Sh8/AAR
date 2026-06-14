@@ -59,17 +59,12 @@ services:
   - type: web
     name: aar-web
     runtime: static
-    buildCommand: cd apps/web && npm ci && VITE_API_BASE="https://${AAR_API_HOST}/api" npm run build
+    # API URL is hardcoded (not resolved via fromService host) — the public
+    # API hostname is fixed and `fromService property: host` proved unreliable
+    # for static-site build vars. If you rename the API service, update this.
+    buildCommand: cd apps/web && npm ci && VITE_API_BASE="https://aar-api.onrender.com/api" npm run build
     staticPublishPath: apps/web/dist
     pullRequestPreviewsEnabled: false
-    envVars:
-      # Resolves to the API service's public host (e.g. aar-api.onrender.com),
-      # baked into the bundle at build time as the absolute API base.
-      - key: AAR_API_HOST
-        fromService:
-          type: web
-          name: aar-api
-          property: host
     routes:
       # SPA fallback: every unknown path serves index.html for client routing.
       - type: rewrite
