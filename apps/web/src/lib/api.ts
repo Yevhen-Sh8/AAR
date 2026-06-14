@@ -4,8 +4,25 @@ const DEMO = import.meta.env.VITE_DEMO === "true";
 //   - demo build        → static mock JSON under <base>/mock
 //   - VITE_API_BASE set  → absolute backend URL (e.g. https://aar-api.onrender.com/api)
 //   - otherwise          → same-origin "/api" (nginx proxy / vite dev proxy)
-const LIVE_BASE = import.meta.env.VITE_API_BASE || "/api";
-const BASE = DEMO ? `${import.meta.env.BASE_URL}mock` : LIVE_BASE;
+function safeBase(raw: string): string {
+  if (!raw) return "/api";
+  const trimmed = raw.replace(/\/+$/, "");
+  if (trimmed.startsWith("/")) return trimmed; // relative — always valid
+  try {
+    // Reject a malformed absolute base (e.g. an empty host "https:///api"
+    // from a misconfigured build var) so fetch never throws an opaque
+    // "string did not match the expected pattern" error.
+    const u = new URL(trimmed);
+    if (!u.host) return "/api";
+    return trimmed;
+  } catch {
+    return "/api";
+  }
+}
+
+// Real backend base — used by both apiFetch (reads) and sync.ts (writes).
+export const API_BASE = safeBase(import.meta.env.VITE_API_BASE || "/api");
+const BASE = DEMO ? `${import.meta.env.BASE_URL}mock` : API_BASE;
 
 const MOCK_ROUTES: Record<string, string> = {
   "/reports/monthly": "/monthly.json",

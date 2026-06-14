@@ -20,9 +20,17 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: "/index.html",
+        // Never serve the SPA shell for API paths — the backend may live on a
+        // different origin (split-host prod), and POST/PATCH must reach it raw.
+        navigateFallbackDenylist: [/^\/api\//, /\/api\//],
         runtimeCaching: [
           {
-            urlPattern: /\/api\/.*/,
+            // Only cache *same-origin GET* reads. Cross-origin API (Render
+            // split-host) and all mutations bypass the service worker entirely,
+            // which avoids opaque "string did not match the expected pattern"
+            // fetch failures on iOS/Safari PWAs.
+            urlPattern: ({ url, request, sameOrigin }) =>
+              sameOrigin && request.method === "GET" && url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",

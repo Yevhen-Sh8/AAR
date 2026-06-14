@@ -1,6 +1,5 @@
+import { API_BASE, IS_DEMO } from "./api";
 import { enqueueEvent, pendingEvents, updateEntry, type QueuedEvent } from "./db";
-
-const API_BASE = "/api";
 
 export interface SyncResult {
   attempted: number;
@@ -20,6 +19,14 @@ export async function submitEvent(
 }
 
 async function tryPost(entry: QueuedEvent): Promise<boolean> {
+  // Demo build has no real backend — keep the entry queued with a clear note
+  // instead of POSTing to a static host (which would 404 / return HTML).
+  if (IS_DEMO) {
+    entry.status = "pending";
+    entry.last_error = "demo-режим — подія не зберігається на сервері";
+    await updateEntry(entry);
+    return false;
+  }
   entry.status = "syncing";
   entry.attempts += 1;
   await updateEntry(entry);
