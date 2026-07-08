@@ -67,6 +67,12 @@ export default function LoginPage({ onLogin }: { onLogin: () => void }) {
         <button type="submit" disabled={busy} className="login-btn">
           <LogIn size={16} /> {busy ? "Вхід…" : "Увійти"}
         </button>
+
+        <p className="login-hint">
+          Типовий доступ: <code>admin@aar.local</code> · пароль задається
+          змінною <code>AAR_ADMIN_PASSWORD</code> в Render (за замовчуванням —{" "}
+          <code>aar-admin-2026</code>, якщо не змінено).
+        </p>
       </form>
     </div>
   );

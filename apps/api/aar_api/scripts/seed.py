@@ -112,11 +112,22 @@ async def _seed_events(session: AsyncSession, rng: random.Random) -> int:
 
 
 async def _seed_admin(session: AsyncSession) -> None:
-    """Create the bootstrap admin from settings if it does not exist."""
+    """Create or update the bootstrap admin from current settings.
+
+    Upsert, not create-once: this makes editing AAR_ADMIN_PASSWORD in the
+    hosting dashboard (which triggers a redeploy → container restart → this
+    script runs again) an actual working "reset my password" mechanism.
+    A create-only version would silently ignore later password changes,
+    leaving the admin locked to whatever value happened to be set on the
+    very first successful boot.
+    """
     s = get_settings()
     email = s.admin_email.strip().lower()
     existing = await session.scalar(select(User).where(User.email == email))
     if existing is not None:
+        existing.hashed_password = hash_password(s.admin_password)
+        existing.role = Role.ADMIN
+        print(f"Synced bootstrap admin password: {email}")
         return
     session.add(
         User(
