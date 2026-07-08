@@ -6,7 +6,7 @@ auth middleware can authorise without a DB round-trip.
 """
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy import select
@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.config import get_settings
 from aar_api.core.db import get_session
+from aar_api.core.rate_limit import SlidingWindowLimiter
 from aar_api.core.security import create_access_token, decode_token, verify_password
 from aar_api.models.user import User
 from aar_api.schemas.auth import LoginRequest, MeResponse, TokenResponse
@@ -22,11 +23,35 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 _bearer = HTTPBearer(auto_error=False)
 
+# Module-level singleton — see core/rate_limit.py for scope/limitations.
+# Reset between tests via the autouse fixture in tests/conftest.py.
+login_limiter = SlidingWindowLimiter(
+    max_attempts=get_settings().login_rate_limit_attempts,
+    window_seconds=get_settings().login_rate_limit_window_seconds,
+)
+
+
+def _client_key(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    payload: LoginRequest, session: AsyncSession = Depends(get_session)
+    payload: LoginRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
 ) -> TokenResponse:
+    allowed, retry_after = login_limiter.check(_client_key(request))
+    if not allowed:
+        wait = int(retry_after) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"забагато спроб входу, спробуйте через {wait} с",
+            headers={"Retry-After": str(wait)},
+        )
     user = await session.scalar(
         select(User).where(User.email == payload.email.strip().lower())
     )

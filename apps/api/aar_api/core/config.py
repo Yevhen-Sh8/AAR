@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     admin_email: str = "admin@aar.local"
     admin_password: str = "aar-admin-2026"
 
+    # Login rate limiting (Wave 5 hardening) — in-process sliding window,
+    # see core/rate_limit.py. No Redis dependency for this pilot deploy.
+    login_rate_limit_attempts: int = 20
+    login_rate_limit_window_seconds: float = 300.0
+
     # When true, the container entrypoint seeds synthetic demo data on first
     # boot (idempotent — skips if events already exist).
     seed_on_start: bool = False

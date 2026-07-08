@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -8,6 +10,7 @@ from aar_api.core.config import get_settings
 from aar_api.core.security import decode_token
 from aar_api.routers import (
     aar,
+    admin,
     audit,
     auth,
     context,
@@ -21,10 +24,21 @@ from aar_api.routers import (
     reports,
 )
 
+logger = logging.getLogger("aar_api")
+
 settings = get_settings()
 
 if settings.environment != "development" and settings.jwt_secret == "change-me-in-production":
     raise RuntimeError("AAR_JWT_SECRET must be set in non-development environments")
+
+if settings.environment != "development" and settings.admin_password == "aar-admin-2026":
+    # Soft warning, not a hard failure — "hardening without blocking" per
+    # Wave 5 scope. The password is still usable; this just nudges the
+    # operator toward changing it via the hosting dashboard.
+    logger.warning(
+        "AAR_ADMIN_PASSWORD is still the hardcoded default — change it in "
+        "your hosting dashboard before real use (see docs/DEPLOY.md)."
+    )
 
 app = FastAPI(title=settings.app_name, version=__version__, root_path="/api")
 
@@ -82,7 +96,44 @@ async def auth_gate(request: Request, call_next):
     return await call_next(request)
 
 
+# ───────────────────────── security headers ──────────────────────────────
+# Applied to every response, including error responses from the auth gate.
+# CSP is looser on the interactive-docs paths (Swagger UI pulls its bundle
+# from a CDN); everywhere else it's a strict same-origin default.
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+    "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
+}
+_DOCS_PATHS = {"/docs", "/redoc", "/openapi.json"}
+_DOCS_CSP = (
+    "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; connect-src 'self'"
+)
+_DEFAULT_CSP = "default-src 'self'; base-uri 'self'; frame-ancestors 'none'"
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for key, value in _SECURITY_HEADERS.items():
+        response.headers[key] = value
+    path = request.url.path
+    if path.startswith("/api/"):
+        path = path[4:]
+    elif path == "/api":
+        path = "/"
+    response.headers["Content-Security-Policy"] = (
+        _DOCS_CSP if path in _DOCS_PATHS else _DEFAULT_CSP
+    )
+    return response
+
+
 app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(health.router)
 app.include_router(dictionaries.router)
 app.include_router(events.router)

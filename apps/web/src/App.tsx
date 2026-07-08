@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, Route, Routes, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -19,19 +19,24 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { installAutoSync } from "./lib/sync";
 import { IS_DEMO } from "./lib/api";
 import { clearSession, getEmail, isAuthed } from "./lib/auth";
-import Dashboard from "./pages/Dashboard";
-import EventsPage from "./pages/EventsPage";
-import EventForm from "./pages/EventForm";
-import CasesPage from "./pages/CasesPage";
-import ImportPage from "./pages/ImportPage";
-import ContextPage from "./pages/ContextPage";
-import ReportsPage from "./pages/ReportsPage";
-import IntegrationsPage from "./pages/IntegrationsPage";
-import AuditPage from "./pages/AuditPage";
-import SettingsPage from "./pages/SettingsPage";
-import DictionariesPage from "./pages/DictionariesPage";
-import LearningLoopPage from "./pages/LearningLoopPage";
+// LoginPage is eager — it's the very first screen unauthenticated users see,
+// and it's small. Every other page is lazy so the initial bundle only ships
+// the auth shell; each route's code (and heavy deps like recharts/xlsx) loads
+// on first visit to that route.
 import LoginPage from "./pages/LoginPage";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const EventsPage = lazy(() => import("./pages/EventsPage"));
+const EventForm = lazy(() => import("./pages/EventForm"));
+const CasesPage = lazy(() => import("./pages/CasesPage"));
+const ImportPage = lazy(() => import("./pages/ImportPage"));
+const ContextPage = lazy(() => import("./pages/ContextPage"));
+const ReportsPage = lazy(() => import("./pages/ReportsPage"));
+const IntegrationsPage = lazy(() => import("./pages/IntegrationsPage"));
+const AuditPage = lazy(() => import("./pages/AuditPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const DictionariesPage = lazy(() => import("./pages/DictionariesPage"));
+const LearningLoopPage = lazy(() => import("./pages/LearningLoopPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -127,20 +132,22 @@ export default function App() {
       <div className="app">
         <Sidebar onLogout={logout} />
         <main className="main">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/events" element={<EventsPage />} />
-            <Route path="/event-form" element={<EventForm />} />
-            <Route path="/import" element={<ImportPage />} />
-            <Route path="/cases" element={<CasesPage />} />
-            <Route path="/context" element={<ContextPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/learning-loop" element={<LearningLoopPage />} />
-            <Route path="/dictionaries" element={<DictionariesPage />} />
-            <Route path="/integrations" element={<IntegrationsPage />} />
-            <Route path="/audit" element={<AuditPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
+          <Suspense fallback={<div className="loading">Завантаження…</div>}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/events" element={<EventsPage />} />
+              <Route path="/event-form" element={<EventForm />} />
+              <Route path="/import" element={<ImportPage />} />
+              <Route path="/cases" element={<CasesPage />} />
+              <Route path="/context" element={<ContextPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/learning-loop" element={<LearningLoopPage />} />
+              <Route path="/dictionaries" element={<DictionariesPage />} />
+              <Route path="/integrations" element={<IntegrationsPage />} />
+              <Route path="/audit" element={<AuditPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </QueryClientProvider>

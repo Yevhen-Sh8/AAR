@@ -42,11 +42,10 @@ services:
         value: production
       - key: AAR_SEED_ON_START
         value: "true"
-      # Pilot setting: allow all origins (API is cookie-free, header-auth only),
-      # so the split-origin web↔api deploy works without host/regex fragility.
-      # Tighten to explicit hosts for a hardened deployment.
+      # Explicit allow-list: the live web app + the GitHub Pages demo.
+      # Update this if aar-web's hostname ever changes.
       - key: AAR_CORS_ORIGINS
-        value: "*"
+        value: "https://aar-web.onrender.com,https://yevhen-sh8.github.io"
       - key: AAR_LLM_ENABLED
         value: "false"
       # Bootstrap admin: seeded on first start. CHANGE BEFORE PILOT.

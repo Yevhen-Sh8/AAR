@@ -50,4 +50,19 @@ export default defineConfig({
       "/api": "http://localhost:8000",
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split rarely-changing vendor deps into their own cacheable chunks,
+        // separate from route chunks created by the React.lazy() calls in
+        // App.tsx. Keeps the initial (login-only) bundle small.
+        manualChunks: {
+          vendor_react: ["react", "react-dom", "react-router-dom"],
+          vendor_query: ["@tanstack/react-query"],
+          vendor_charts: ["recharts"],
+          vendor_icons: ["lucide-react"],
+        },
+      },
+    },
+  },
 });

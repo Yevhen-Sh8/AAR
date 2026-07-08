@@ -69,9 +69,21 @@ exec uvicorn aar_api.main:app --host 0.0.0.0 --port $PORT
 синхронного Alembic драйвер відрізається в `alembic/env.py`). Той самий
 `AAR_DATABASE_URL` працює і локально, і в проді.
 
-**CORS.** API дозволяє origin GitHub Pages (`AAR_CORS_ORIGINS`) + будь-який
-`*.onrender.com` через regex (`AAR_CORS_ORIGIN_REGEX`), тож статичний фронтенд
-ходить до бекенду без ручного налаштування.
+**CORS.** `AAR_CORS_ORIGINS` — явний allow-list (через кому): `aar-web` +
+GitHub Pages demo. Якщо `AAR_CORS_ORIGINS` містить `*`, бекенд перемикається
+в bullet-proof pilot-режим (echo `*` без credentials) — зручно на самому
+старті, коли фінальний домен ще невідомий, але для проду тримай явний список.
+
+**Security headers.** Кожна відповідь API несе `X-Content-Type-Options`,
+`X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`,
+`Strict-Transport-Security` і `Content-Security-Policy` (окрема, м'якша
+політика на `/docs`/`/redoc`, бо Swagger UI тягне бандл з CDN).
+
+**Rate limiting входу.** `/auth/login` обмежений — за замовчуванням 20 спроб
+на 5 хвилин з одного IP (`AAR_LOGIN_RATE_LIMIT_ATTEMPTS` /
+`AAR_LOGIN_RATE_LIMIT_WINDOW_SECONDS`). Ліміт живе в пам'яті процесу (без
+Redis) — скидається при рестарті контейнера; достатньо для одного
+pilot-інстансу, не для розподіленої атаки.
 
 ## Змінні середовища API (префікс `AAR_`)
 
@@ -87,6 +99,8 @@ exec uvicorn aar_api.main:app --host 0.0.0.0 --port $PORT
 | `AAR_ANTHROPIC_API_KEY` | Ключ Anthropic | (порожньо; задай вручну) |
 | `AAR_ADMIN_EMAIL` | Email bootstrap-адміна | `admin@aar.local` |
 | `AAR_ADMIN_PASSWORD` | Пароль bootstrap-адміна (синхронізується при кожному старті) | задай вручну в дашборді |
+| `AAR_LOGIN_RATE_LIMIT_ATTEMPTS` | Спроб входу на вікно | `20` |
+| `AAR_LOGIN_RATE_LIMIT_WINDOW_SECONDS` | Тривалість вікна (с) | `300` |
 
 ## Альтернатива: локально через Docker Compose
 
@@ -123,12 +137,31 @@ Render-бекенд: у `.github/workflows/pages.yml` додай до build-кр
 5. Відкрий кейс → «Згенерувати аналіз (LLM)» (якщо ключ заданий) → аналіз
    зберігається в кейсі.
 
+## Резервне копіювання (Wave 5, тільки браузер)
+
+Безкоштовний план Postgres на Render **не робить автоматичних бекапів** і
+**видаляється через 90 днів**. Оскільки цей деплой керується виключно з
+браузера (без терміналу), звичайний `pg_dump` тут не варіант день-у-день.
+
+**Що є зараз:** Налаштування → «Резервна копія» → кнопка «Завантажити
+резервну копію (JSON)» — авторизований (роль admin) ендпойнт
+`GET /admin/export` віддає повний JSON-знімок робочих таблиць
+(довідники, вироби, події, AAR-кейси, рекомендації, контекст-активи,
+користувачі без хешів паролів) як файл для завантаження в браузер.
+Рекомендація: раз на тиждень під час пілоту.
+
+**Чого це НЕ замінює:** це не point-in-time recovery і не автоматичний
+процес. Для реального проду — онови план Postgres на Render до платного
+(додає щоденні бекапи + PITR) або постав окремий cron, що регулярно тягне
+`/admin/export` і зберігає файл десь поза Render.
+
 ## Безпека прод-контуру (ISO/IEC 27001)
 
 Перед бойовим використанням (не пілотом) — див.
 `docs/normative/iso-27001-controls.md`. Ключове, що НЕ покрито free-деплоєм і
 потребує рішення:
 - шифрування at-rest (Render шифрує диски; для суверенного контуру — LUKS/TDE);
-- резервне копіювання + restore-drill;
+- справжній point-in-time backup/restore (платний план Postgres — JSON-експорт
+  вище лише супровідна страховка, не заміна);
 - ротація секретів і JWT;
 - приватна мережа / VPN-доступ замість публічного URL.
