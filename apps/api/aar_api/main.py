@@ -22,6 +22,7 @@ from aar_api.routers import (
     learning,
     llm,
     reports,
+    signals,
 )
 
 logger = logging.getLogger("aar_api")
@@ -145,3 +146,4 @@ app.include_router(integrations.router)
 app.include_router(audit.router)
 app.include_router(context.router)
 app.include_router(learning.router)
+app.include_router(signals.router)

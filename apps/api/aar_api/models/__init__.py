@@ -22,6 +22,7 @@ from aar_api.models.integration import (
     Subscription,
     WebhookEventKind,
 )
+from aar_api.models.signal import PreTaskSignal, SignalKind, SignalStatus
 from aar_api.models.user import Role, User
 
 __all__ = [
@@ -42,10 +43,13 @@ __all__ = [
     "LossReason",
     "Operator",
     "Outcome",
+    "PreTaskSignal",
     "Recommendation",
     "RecommendationStatus",
     "RepairReason",
     "Role",
+    "SignalKind",
+    "SignalStatus",
     "Subscription",
     "TriggerType",
     "UsageEvent",

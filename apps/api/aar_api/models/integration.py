@@ -25,6 +25,7 @@ class WebhookEventKind(StrEnum):
     AAR_CASE_CLOSED = "aar_case.closed"
     RECOMMENDATION_AUTO_VALIDATED = "recommendation.auto_validated"
     INDIVIDUAL_REPORT_REQUESTED = "individual_report.requested"
+    SIGNAL_CREATED = "signal.created"
 
 
 class Subscription(Base):

@@ -565,6 +565,16 @@ button.icon-btn:hover { color: var(--accent-red); }
 }
 .sidebar-logout:hover { color: var(--accent-red); border-color: var(--accent-red); }
 
+/* ───── Pre-task signals ───── */
+.signal-cards { display: flex; flex-direction: column; gap: 10px; }
+.signal-review-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+.signal-review-card textarea { font-family: inherit; }
+
 /* ───── NATO LL cycle UI ───── */
 .stage-columns {
   display: grid;
