@@ -15,6 +15,7 @@ import {
   Activity,
   LogOut,
   Megaphone,
+  ClipboardList,
 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { installAutoSync } from "./lib/sync";
@@ -39,6 +40,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DictionariesPage = lazy(() => import("./pages/DictionariesPage"));
 const LearningLoopPage = lazy(() => import("./pages/LearningLoopPage"));
 const SignalsPage = lazy(() => import("./pages/SignalsPage"));
+const BriefingPage = lazy(() => import("./pages/BriefingPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -51,6 +53,7 @@ const NAV = [
   { to: "/event-form", icon: FilePlus, label: "Подати подію" },
   { to: "/import", icon: Upload, label: "Імпорт CSV/XLSX" },
   { section: "AAR" },
+  { to: "/briefing", icon: ClipboardList, label: "Брифінг місії" },
   { to: "/signals", icon: Megaphone, label: "Сигнали (до завдання)" },
   { to: "/cases", icon: FolderKanban, label: "Кейси" },
   { to: "/context", icon: Library, label: "Контекст-активи" },
@@ -141,6 +144,7 @@ export default function App() {
               <Route path="/events" element={<EventsPage />} />
               <Route path="/event-form" element={<EventForm />} />
               <Route path="/import" element={<ImportPage />} />
+              <Route path="/briefing" element={<BriefingPage />} />
               <Route path="/signals" element={<SignalsPage />} />
               <Route path="/cases" element={<CasesPage />} />
               <Route path="/context" element={<ContextPage />} />

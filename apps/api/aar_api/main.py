@@ -13,6 +13,7 @@ from aar_api.routers import (
     admin,
     audit,
     auth,
+    briefing,
     context,
     dictionaries,
     events,
@@ -147,3 +148,4 @@ app.include_router(audit.router)
 app.include_router(context.router)
 app.include_router(learning.router)
 app.include_router(signals.router)
+app.include_router(briefing.router)
