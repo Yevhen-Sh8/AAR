@@ -3,7 +3,7 @@ import { Settings as SettingsIcon, ExternalLink, DatabaseBackup } from "lucide-r
 import { API_BASE, IS_DEMO } from "../lib/api";
 import { getToken } from "../lib/auth";
 
-const APP_VERSION = "0.4.0";
+const APP_VERSION = "1.7.0";
 
 const FEATURES = [
   { key: "Two-level data model", state: "available", note: "Events → AAR Cases" },

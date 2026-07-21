@@ -588,6 +588,7 @@ security / consistency / ux, кожна знахідка → окремий аг
 | Як працює live-режим (прод) | `apps/web/src/lib/api.ts` (`VITE_API_BASE`) |
 | Як підняти робочий додаток | `docs/DEPLOY.md` + `render.yaml` + `apps/api/start.sh` |
 | Як bootstrapнути локально | `CLAUDE.md` § Build & Test Commands |
+| Формальна документація (паспорт/опис/настанова) | `docs/passport/` (ЄСПД/ДСТУ) |
 
 ---
 
