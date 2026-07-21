@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from jose import jwt
+import jwt
 from passlib.context import CryptContext
 
 from aar_api.core.config import get_settings

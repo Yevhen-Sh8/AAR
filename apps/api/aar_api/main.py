@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from jose import JWTError
+from jwt import PyJWTError as JWTError
 
 from aar_api import __version__
 from aar_api.core.config import get_settings
