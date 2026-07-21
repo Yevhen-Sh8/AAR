@@ -205,3 +205,71 @@ async def test_connectors_endpoint_excludes_oberig() -> None:
         assert "kropyva" in body["kinds"]
         assert "odin" in body["kinds"]
         assert "sap" in body["kinds"]
+        assert "telegram" in body["kinds"]
+        assert "telegram" in body["notes"]
+
+
+class _FakeResp:
+    def __init__(self, code: int) -> None:
+        self.status_code = code
+        self.is_success = 200 <= code < 300
+        self.text = ""
+
+
+class _FakeClient:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    async def post(self, url, content=None, headers=None, timeout=None):  # noqa: ANN001
+        self.calls.append({"url": url, "content": content, "headers": headers})
+        return _FakeResp(200)
+
+    async def aclose(self) -> None:
+        pass
+
+
+async def test_telegram_dispatch_hits_bot_api_with_message() -> None:
+    """A telegram subscription posts a human message to the Bot API, keyed by
+    chat_id, with the token in the URL (never in a signature header)."""
+    from aar_api.models.integration import ConnectorKind, Subscription, WebhookEventKind
+
+    Session = async_sessionmaker(_engine, expire_on_commit=False)
+    async with Session() as s:
+        s.add(
+            Subscription(
+                name="tg-alerts",
+                kind=ConnectorKind.TELEGRAM,
+                target_url="-1001234567890",   # chat_id
+                secret="123456:BOTTOKEN",       # bot token
+                events=[WebhookEventKind.AAR_CASE_CREATED.value],
+                active=True,
+            )
+        )
+        await s.commit()
+
+    fake = _FakeClient()
+    async with Session() as s:
+        canonical = {
+            "id": 7,
+            "title": "Аномалія виробу A-00094",
+            "trigger": "item_anomaly",
+            "status": "open",
+        }
+        deliveries = await integ_svc.dispatch(
+            s, WebhookEventKind.AAR_CASE_CREATED, canonical, http_client=fake
+        )
+        await s.commit()
+
+    assert len(deliveries) == 1
+    assert deliveries[0].status.value == "delivered"
+    assert len(fake.calls) == 1
+    call = fake.calls[0]
+    assert call["url"] == "https://api.telegram.org/bot123456:BOTTOKEN/sendMessage"
+    # Token must not appear in any header (no HMAC for telegram).
+    assert all("BOTTOKEN" not in v for v in call["headers"].values())
+    import json as _json
+    body = _json.loads(call["content"])
+    assert body["chat_id"] == "-1001234567890"
+    assert body["parse_mode"] == "HTML"
+    assert "Відкрито AAR-кейс" in body["text"]
+    assert "Аномалія виробу A-00094" in body["text"]

@@ -1,6 +1,6 @@
+import { API_BASE, IS_DEMO } from "./api";
+import { clearSession, emitUnauthorized, getToken } from "./auth";
 import { enqueueEvent, pendingEvents, updateEntry, type QueuedEvent } from "./db";
-
-const API_BASE = "/api";
 
 export interface SyncResult {
   attempted: number;
@@ -20,13 +20,25 @@ export async function submitEvent(
 }
 
 async function tryPost(entry: QueuedEvent): Promise<boolean> {
+  // Demo build has no real backend — keep the entry queued with a clear note
+  // instead of POSTing to a static host (which would 404 / return HTML).
+  if (IS_DEMO) {
+    entry.status = "pending";
+    entry.last_error = "demo-режим — подія не зберігається на сервері";
+    await updateEntry(entry);
+    return false;
+  }
   entry.status = "syncing";
   entry.attempts += 1;
   await updateEntry(entry);
   try {
+    const token = getToken();
     const resp = await fetch(`${API_BASE}/events`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(entry.payload),
     });
     if (resp.status >= 200 && resp.status < 300) {
@@ -36,6 +48,15 @@ async function tryPost(entry: QueuedEvent): Promise<boolean> {
       entry.last_error = null;
       await updateEntry(entry);
       return true;
+    }
+    if (resp.status === 401) {
+      // Session expired — keep the event queued and bounce to login.
+      clearSession();
+      emitUnauthorized();
+      entry.status = "pending";
+      entry.last_error = "потрібен вхід";
+      await updateEntry(entry);
+      return false;
     }
     entry.status = "failed";
     entry.last_error = `HTTP ${resp.status}`;

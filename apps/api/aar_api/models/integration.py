@@ -16,12 +16,20 @@ class ConnectorKind(StrEnum):
     DELTA = "delta"
     KROPYVA = "kropyva"
     SAP = "sap"
+    # Telegram Bot API: target_url holds the chat_id, secret holds the bot
+    # token. The dispatcher posts a human-readable message to
+    # https://api.telegram.org/bot<token>/sendMessage.
+    TELEGRAM = "telegram"
 
 
 class WebhookEventKind(StrEnum):
     USAGE_EVENT_CREATED = "usage_event.created"
     AAR_CASE_CREATED = "aar_case.created"
+    AAR_CASE_TRANSITIONED = "aar_case.transitioned"
     AAR_CASE_CLOSED = "aar_case.closed"
+    RECOMMENDATION_AUTO_VALIDATED = "recommendation.auto_validated"
+    INDIVIDUAL_REPORT_REQUESTED = "individual_report.requested"
+    SIGNAL_CREATED = "signal.created"
 
 
 class Subscription(Base):

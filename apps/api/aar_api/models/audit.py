@@ -21,8 +21,12 @@ class AuditAction(StrEnum):
     EVENT_CREATED = "event.created"
     EVENT_INBOUND = "event.inbound"
     CASE_CREATED = "case.created"
+    CASE_TRANSITIONED = "case.transitioned"  # NATO state machine move
+    CASE_ANALYSIS_DRAFTED = "case.analysis_drafted"  # LLM/manual analysis stored
     CASE_CLOSED = "case.closed"
     RECOMMENDATION_UPDATED = "recommendation.updated"
+    RECOMMENDATION_AUTO_VALIDATED = "recommendation.auto_validated"
+    RECOMMENDATION_REGRESSED = "recommendation.regressed"
     SUBSCRIPTION_CREATED = "subscription.created"
     SUBSCRIPTION_DELETED = "subscription.deleted"
     TRIGGERS_RUN = "triggers.run"
@@ -30,6 +34,9 @@ class AuditAction(StrEnum):
     CONTEXT_ASSET_VALIDATED = "context_asset.validated"
     CONTEXT_ASSET_REJECTED = "context_asset.rejected"
     CONTEXT_ASSET_DEPRECATED = "context_asset.deprecated"
+    SIGNAL_CREATED = "signal.created"
+    SIGNAL_REVIEWED = "signal.reviewed"
+    SIGNAL_CONVERTED = "signal.converted"
 
 
 class AuditLog(Base):

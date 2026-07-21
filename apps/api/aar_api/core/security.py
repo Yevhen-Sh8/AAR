@@ -1,12 +1,14 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from jose import jwt
+import jwt
 from passlib.context import CryptContext
 
 from aar_api.core.config import get_settings
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pbkdf2_sha256 is pure-Python (no native bcrypt backend) — avoids the
+# passlib↔bcrypt 4.x incompatibility and runs identically everywhere.
+_pwd = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:

@@ -1,11 +1,14 @@
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aar_api.core.config import get_settings
 from aar_api.core.db import get_session
 from aar_api.models.aar import AARCase, IndividualReport
+from aar_api.models.audit import AuditAction
 from aar_api.models.dictionaries import LossReason, Operator, RepairReason
 from aar_api.models.event import UsageEvent
 from aar_api.schemas.llm import (
@@ -16,6 +19,7 @@ from aar_api.schemas.llm import (
     DraftAnalysisResponse,
 )
 from aar_api.services import llm as llm_service
+from aar_api.services.audit import append as audit_append
 from aar_api.services.context_assets import (
     persist_drafts,
     record_usage,
@@ -115,9 +119,26 @@ async def draft_case_analysis(
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
+
+    # Persist the draft into the case so it survives close (Wave 1 gap #2).
+    # Don't overwrite a human-edited analysis — only fill if empty.
+    if not case.analysis:
+        case.analysis = result.task_output
+        case.analysis_source = f"llm:{get_settings().llm_default_model}"
+        case.analysis_drafted_at = datetime.now(UTC)
+        await audit_append(
+            session,
+            action=AuditAction.CASE_ANALYSIS_DRAFTED,
+            entity_type="aar_case",
+            entity_id=case.id,
+            payload={"source": case.analysis_source, "via": "llm"},
+        )
+
     await _persist_assets_if_any(
         session, result, source=f"case:{case_id}", source_agent="draft_case_analysis"
     )
+    await session.commit()
+    await session.refresh(case)
     return DraftAnalysisResponse(markdown=result.task_output)
 
 

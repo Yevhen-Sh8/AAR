@@ -1,0 +1,67 @@
+[
+  {
+    "id": 5,
+    "kind": "warning",
+    "title": "Нова частота глушіння у секторі Б",
+    "description": "Перед завтрашнім вильотом: за даними сусіднього підрозділу противник перейшов на нову частоту РЕБ у секторі Б.",
+    "author": null,
+    "task_context": "Виліт 20.07, сектор Б",
+    "status": "new",
+    "review_note": null,
+    "case_id": null,
+    "created_at": "2026-07-19T08:12:00Z",
+    "reviewed_at": null
+  },
+  {
+    "id": 4,
+    "kind": "risk",
+    "title": "Партія B-2026-07 — дрейф гіроскопа",
+    "description": "Три вироби з нової партії показали дрейф гіроскопа на стенді. Рекомендую перевірити всю партію перед видачею.",
+    "author": "Технік Е-03",
+    "task_context": null,
+    "status": "converted",
+    "review_note": null,
+    "case_id": 28,
+    "created_at": "2026-07-18T14:40:00Z",
+    "reviewed_at": "2026-07-18T16:05:00Z"
+  },
+  {
+    "id": 3,
+    "kind": "proposal",
+    "title": "Додати чек-лист передстартової перевірки антени",
+    "description": "Двічі за місяць втрачали зв'язок через недокручений конектор. Простий чек-лист прибере проблему.",
+    "author": "Оператор Е-07",
+    "task_context": null,
+    "status": "accepted",
+    "review_note": "внесено у СОП підготовки",
+    "case_id": null,
+    "created_at": "2026-07-15T09:00:00Z",
+    "reviewed_at": "2026-07-16T10:30:00Z"
+  },
+  {
+    "id": 2,
+    "kind": "info",
+    "title": "Погода 21.07 — поривчастий вітер до 18 м/с",
+    "description": "Для планування: прогноз на 21.07 межовий для виробів типу A.",
+    "author": "Черговий метеопост",
+    "task_context": "Планування 21.07",
+    "status": "acknowledged",
+    "review_note": null,
+    "case_id": null,
+    "created_at": "2026-07-19T06:00:00Z",
+    "reviewed_at": "2026-07-19T06:45:00Z"
+  },
+  {
+    "id": 1,
+    "kind": "proposal",
+    "title": "Виносити запасні батареї окремим кейсом",
+    "description": "Пропозиція відхилена: чинний регламент транспортування вже покриває це.",
+    "author": null,
+    "task_context": null,
+    "status": "dismissed",
+    "review_note": "дублює чинний регламент",
+    "case_id": null,
+    "created_at": "2026-07-10T12:00:00Z",
+    "reviewed_at": "2026-07-11T08:20:00Z"
+  }
+]

@@ -16,6 +16,10 @@ from sqlalchemy.orm import aliased
 from aar_api.models.aar import AARCase, TriggerType
 from aar_api.models.dictionaries import LossReason, Operator, RepairReason, Zone
 from aar_api.models.event import Item, Outcome, UsageEvent
+from aar_api.services.recommendation_validation import (
+    ValidationConfig,
+    auto_validate_recommendations,
+)
 
 
 @dataclass(frozen=True)
@@ -129,7 +133,11 @@ async def _signature_exists(session: AsyncSession, signature: str) -> bool:
 
 async def evaluate_triggers(
     session: AsyncSession, today: date, cfg: TriggerConfig | None = None
-) -> tuple[list[AARCase], int]:
+) -> tuple[list[AARCase], int, list[int], list[int]]:
+    """Run trigger engine + Monitor & Validate stage.
+
+    Returns: (created_cases, skipped_count, auto_validated_rec_ids, regressed_rec_ids)
+    """
     cfg = cfg or TriggerConfig()
     window_start = today - timedelta(days=max(
         cfg.t1_consecutive_days, cfg.t2_window_days, cfg.t3_window_days, 2
@@ -138,9 +146,11 @@ async def evaluate_triggers(
 
     created: list[AARCase] = []
     skipped = 0
+    fired_signatures: set[str] = set()
 
     for op_code, op_id in _eval_t1(events, cfg, today):
         sig = f"T1:{op_code}:{today.isoformat()}"
+        fired_signatures.add(sig)
         if await _signature_exists(session, sig):
             skipped += 1
             continue
@@ -154,6 +164,7 @@ async def evaluate_triggers(
 
     for sig_tail in _eval_t2(events, cfg, today):
         sig = f"T2:{sig_tail}:{today.isoformat()}"
+        fired_signatures.add(sig)
         if await _signature_exists(session, sig):
             skipped += 1
             continue
@@ -166,6 +177,7 @@ async def evaluate_triggers(
 
     for serial, _item_id in _eval_t3(events, cfg, today):
         sig = f"T3:{serial}:{today.isoformat()}"
+        fired_signatures.add(sig)
         if await _signature_exists(session, sig):
             skipped += 1
             continue
@@ -178,6 +190,7 @@ async def evaluate_triggers(
 
     if _eval_t4(events, cfg, today):
         sig = f"T4:{today.isoformat()}"
+        fired_signatures.add(sig)
         if await _signature_exists(session, sig):
             skipped += 1
         else:
@@ -189,4 +202,9 @@ async def evaluate_triggers(
             created.append(case)
 
     await session.flush()
-    return created, skipped
+
+    # Monitor & Validate — close the NATO LL loop.
+    auto_validated, regressed = await auto_validate_recommendations(
+        session, today, fired_signatures, ValidationConfig()
+    )
+    return created, skipped, auto_validated, regressed

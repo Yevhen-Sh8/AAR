@@ -121,24 +121,39 @@ export default function IntegrationsPage() {
               </select>
             </label>
             <label style={{ gridColumn: "1 / -1" }}>
-              Target URL
+              {form.kind === "telegram" ? "Chat ID (куди слати)" : "Target URL"}
               <input
                 className="form-input"
                 value={form.target_url}
                 onChange={(e) => setForm({ ...form, target_url: e.target.value })}
-                placeholder="https://partner.example.com/hooks/aar"
+                placeholder={
+                  form.kind === "telegram"
+                    ? "-1001234567890 або @channel"
+                    : "https://partner.example.com/hooks/aar"
+                }
               />
             </label>
             <label style={{ gridColumn: "1 / -1" }}>
-              HMAC secret
+              {form.kind === "telegram" ? "Токен бота" : "HMAC secret"}
               <input
                 className="form-input"
                 type="password"
                 value={form.secret}
                 onChange={(e) => setForm({ ...form, secret: e.target.value })}
-                placeholder="використовується для X-AAR-Signature"
+                placeholder={
+                  form.kind === "telegram"
+                    ? "123456:AA... (від @BotFather)"
+                    : "використовується для X-AAR-Signature"
+                }
               />
             </label>
+            {form.kind === "telegram" && (
+              <p style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--text-muted)", marginTop: -6 }}>
+                ⓘ Створіть бота через @BotFather, додайте його в чат/канал, а
+                chat_id отримайте (напр. через @getidsbot). Токен зберігається
+                як secret і не потрапляє в журнал доставок.
+              </p>
+            )}
             <div style={{ gridColumn: "1 / -1" }}>
               <button
                 onClick={() => create.mutate(form)}

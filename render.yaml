@@ -1,0 +1,76 @@
+# Render Blueprint — one-click production deploy (Wave 4).
+#
+# How to use (browser only, no local install):
+#   1. Push this repo to GitHub (already done).
+#   2. Go to https://dashboard.render.com → New → Blueprint.
+#   3. Connect this repository and pick the branch.
+#   4. Render reads this file and provisions: a free Postgres DB, the API
+#      (Docker), and the web frontend (static site). Click "Apply".
+#   5. Wait ~5 min for the first build. The API self-migrates and seeds demo
+#      data on first boot. Open the aar-web URL — fully working app.
+#
+# To enable the AI features, set AAR_ANTHROPIC_API_KEY and AAR_LLM_ENABLED=true
+# on the aar-api service after the first deploy.
+#
+# Free-tier note: the API web service spins down after 15 min idle; the first
+# request after idle cold-starts in ~30–60 s. The static frontend never sleeps.
+
+databases:
+  - name: aar-db
+    plan: free
+    databaseName: aar
+    user: aar
+
+services:
+  # ───────────────────────── API (FastAPI, Docker) ─────────────────────────
+  - type: web
+    name: aar-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: ./apps/api
+    healthCheckPath: /health/live
+    autoDeploy: true
+    envVars:
+      - key: AAR_DATABASE_URL
+        fromDatabase:
+          name: aar-db
+          property: connectionString
+      - key: AAR_JWT_SECRET
+        generateValue: true
+      - key: AAR_ENVIRONMENT
+        value: production
+      - key: AAR_SEED_ON_START
+        value: "true"
+      # Explicit allow-list: the live web app + the GitHub Pages demo.
+      # Update this if aar-web's hostname ever changes.
+      - key: AAR_CORS_ORIGINS
+        value: "https://aar-web.onrender.com,https://yevhen-sh8.github.io"
+      - key: AAR_LLM_ENABLED
+        value: "false"
+      # Bootstrap admin: seeded on first start. CHANGE BEFORE PILOT.
+      - key: AAR_ADMIN_EMAIL
+        value: admin@aar.local
+      - key: AAR_ADMIN_PASSWORD
+        sync: false
+      # Set this in the dashboard to turn on AI drafting/classification.
+      - key: AAR_ANTHROPIC_API_KEY
+        sync: false
+
+  # ─────────────────────── Web (React PWA, static) ─────────────────────────
+  # Note: static sites are free by default — Render rejects an explicit
+  # `plan` field here ("no such plan free for service type web").
+  - type: web
+    name: aar-web
+    runtime: static
+    # API URL is hardcoded (not resolved via fromService host) — the public
+    # API hostname is fixed and `fromService property: host` proved unreliable
+    # for static-site build vars. If you rename the API service, update this.
+    buildCommand: cd apps/web && npm ci && VITE_API_BASE="https://aar-api.onrender.com/api" npm run build
+    staticPublishPath: apps/web/dist
+    pullRequestPreviewsEnabled: false
+    routes:
+      # SPA fallback: every unknown path serves index.html for client routing.
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -16,3 +16,11 @@ async def _db_schema():
     yield
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_rate_limit():
+    from aar_api.routers.auth import login_limiter
+
+    login_limiter.reset()
+    yield

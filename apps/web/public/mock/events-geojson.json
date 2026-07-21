@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "count": 14,
+  "features": [
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [36.23, 49.99] }, "properties": { "id": 5001, "serial_no": "A-00142", "operator_code": "E-07", "item_type_code": "A", "outcome": "lost", "event_date": "2026-06-02" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [36.31, 50.04] }, "properties": { "id": 5002, "serial_no": "A-00151", "operator_code": "E-07", "item_type_code": "A", "outcome": "lost", "event_date": "2026-06-03" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [36.19, 49.92] }, "properties": { "id": 5003, "serial_no": "B-00088", "operator_code": "E-07", "item_type_code": "B", "outcome": "repair", "event_date": "2026-06-03" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [35.02, 48.47] }, "properties": { "id": 5004, "serial_no": "A-00120", "operator_code": "E-03", "item_type_code": "A", "outcome": "success", "event_date": "2026-06-01" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [35.14, 48.51] }, "properties": { "id": 5005, "serial_no": "A-00121", "operator_code": "E-03", "item_type_code": "A", "outcome": "success", "event_date": "2026-06-04" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [34.98, 48.39] }, "properties": { "id": 5006, "serial_no": "B-00090", "operator_code": "E-03", "item_type_code": "B", "outcome": "success", "event_date": "2026-06-05" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [37.55, 47.10] }, "properties": { "id": 5007, "serial_no": "A-00133", "operator_code": "E-05", "item_type_code": "A", "outcome": "success", "event_date": "2026-06-02" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [37.62, 47.05] }, "properties": { "id": 5008, "serial_no": "A-00134", "operator_code": "E-05", "item_type_code": "A", "outcome": "lost", "event_date": "2026-06-06" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [30.52, 50.45] }, "properties": { "id": 5009, "serial_no": "B-00071", "operator_code": "E-01", "item_type_code": "B", "outcome": "success", "event_date": "2026-06-01" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [30.61, 50.51] }, "properties": { "id": 5010, "serial_no": "A-00110", "operator_code": "E-01", "item_type_code": "A", "outcome": "repair", "event_date": "2026-06-04" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [32.05, 49.44] }, "properties": { "id": 5011, "serial_no": "A-00115", "operator_code": "E-02", "item_type_code": "A", "outcome": "success", "event_date": "2026-06-03" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [33.42, 47.91] }, "properties": { "id": 5012, "serial_no": "B-00082", "operator_code": "E-09", "item_type_code": "B", "outcome": "success", "event_date": "2026-06-05" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [38.02, 48.02] }, "properties": { "id": 5013, "serial_no": "A-00160", "operator_code": "E-08", "item_type_code": "A", "outcome": "lost", "event_date": "2026-06-06" } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [37.98, 47.96] }, "properties": { "id": 5014, "serial_no": "A-00161", "operator_code": "E-08", "item_type_code": "A", "outcome": "repair", "event_date": "2026-06-07" } }
+  ]
+}

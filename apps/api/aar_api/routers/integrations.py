@@ -106,6 +106,11 @@ async def list_connectors() -> dict[str, Any]:
             "odin": "C2-style envelope with timestamp/actor/subject/geo",
             "sap": "Flat one-level record with PascalCase field names",
             "generic": "Pass-through {event, data} envelope",
+            "telegram": (
+                "Повідомлення в Telegram через Bot API. "
+                "target_url = chat_id (напр. -1001234567890 або @channel), "
+                "secret = токен бота."
+            ),
         },
     }
 

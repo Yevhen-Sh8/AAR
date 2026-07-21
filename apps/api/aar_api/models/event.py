@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from enum import StrEnum
 
-from sqlalchemy import JSON, Date, DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aar_api.core.db import Base
@@ -38,6 +38,13 @@ class UsageEvent(Base):
     )
     notes: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     location: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Wave 2: distinguishes "launched and succeeded/failed" from "aborted
+    # before reaching target" (EW jam, weather, pre-flight technical scrub).
+    # narrow MSR  = success / launched     (only non-aborted)
+    # full   MSR  = success / (launched + aborted)
+    # See literature note in docs/metrics.md §3.
+    aborted: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    abort_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

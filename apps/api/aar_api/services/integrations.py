@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import json
 import logging
+from html import escape as _esc
 from typing import Any
 
 import httpx
@@ -136,12 +137,57 @@ def _adapt_sap(payload: dict[str, Any], event_kind: WebhookEventKind) -> dict[st
     return flat
 
 
+def _telegram_text(event_kind: WebhookEventKind, p: dict[str, Any]) -> str:
+    """Human-readable Telegram message (HTML parse_mode). Dynamic fields are
+    escaped; only the <b> tags are literal markup."""
+    e = _esc
+    ek = event_kind.value
+    if ek == "aar_case.created":
+        return (
+            f"🟠 <b>Відкрито AAR-кейс</b>\n{e(str(p.get('title', '')))}\n"
+            f"Тригер: {e(str(p.get('trigger', '')))}"
+        )
+    if ek == "aar_case.transitioned":
+        t = p.get("transition") or {}
+        return (
+            f"🔄 <b>AAR-кейс #{p.get('id', '')}</b>\n"
+            f"{e(str(t.get('from', '')))} → {e(str(t.get('to', '')))}\n"
+            f"{e(str(p.get('title', '')))}"
+        )
+    if ek == "aar_case.closed":
+        return f"✅ <b>Кейс закрито</b>\n{e(str(p.get('title', '')))}"
+    if ek == "recommendation.auto_validated":
+        return f"✔️ <b>Рекомендацію підтверджено даними</b>\n{e(str(p.get('text', '')))}"
+    if ek == "signal.created":
+        ctx = f"\nКонтекст: {e(str(p['task_context']))}" if p.get("task_context") else ""
+        return (
+            f"⚠️ <b>Новий сигнал</b> ({e(str(p.get('kind', '')))})\n"
+            f"{e(str(p.get('title', '')))}{ctx}"
+        )
+    if ek == "individual_report.requested":
+        return f"📝 <b>Запит індивідуального звіту</b>\nКейс #{p.get('case_id', '')}"
+    if ek == "usage_event.created":
+        return f"🔹 <b>Нова подія</b>\nРезультат: {e(str(p.get('outcome', '')))}"
+    return f"<b>{e(ek)}</b>"
+
+
+def _adapt_telegram(payload: dict[str, Any], event_kind: WebhookEventKind) -> dict[str, Any]:
+    """Telegram sendMessage body. chat_id is a placeholder here — dispatch()
+    overrides it with the subscription's target_url."""
+    return {
+        "chat_id": "<chat_id>",
+        "text": _telegram_text(event_kind, payload),
+        "parse_mode": "HTML",
+    }
+
+
 _ADAPTERS = {
     ConnectorKind.GENERIC: _adapt_generic,
     ConnectorKind.ODIN: _adapt_odin,
     ConnectorKind.DELTA: _adapt_delta,
     ConnectorKind.KROPYVA: _adapt_kropyva,
     ConnectorKind.SAP: _adapt_sap,
+    ConnectorKind.TELEGRAM: _adapt_telegram,
 }
 
 
@@ -161,13 +207,21 @@ def sign(secret: str, body: bytes) -> str:
 async def _post(
     sub: Subscription, body: bytes, *, client: httpx.AsyncClient
 ) -> tuple[int | None, str | None]:
-    headers = {"Content-Type": "application/json"}
-    if sub.headers:
-        headers.update(sub.headers)
-    if sub.secret:
-        headers["X-AAR-Signature"] = sign(sub.secret, body)
+    if sub.kind == ConnectorKind.TELEGRAM:
+        # Bot token in sub.secret; message goes to the Telegram Bot API, not
+        # to target_url (which holds the chat_id). No HMAC — Telegram doesn't
+        # use it, and the token must never leak into a signature header.
+        url = f"https://api.telegram.org/bot{sub.secret}/sendMessage"
+        headers = {"Content-Type": "application/json"}
+    else:
+        url = sub.target_url
+        headers = {"Content-Type": "application/json"}
+        if sub.headers:
+            headers.update(sub.headers)
+        if sub.secret:
+            headers["X-AAR-Signature"] = sign(sub.secret, body)
     try:
-        resp = await client.post(sub.target_url, content=body, headers=headers, timeout=10.0)
+        resp = await client.post(url, content=body, headers=headers, timeout=10.0)
         return resp.status_code, None if resp.is_success else resp.text[:500]
     except httpx.HTTPError as e:
         return None, str(e)
@@ -194,6 +248,9 @@ async def dispatch(
             if event_kind.value not in (sub.events or []):
                 continue
             payload = render_payload(sub.kind, event_kind, canonical)
+            if sub.kind == ConnectorKind.TELEGRAM:
+                # Fill the real chat_id (the adapter used a placeholder).
+                payload = {**payload, "chat_id": sub.target_url}
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             status, error = await _post(sub, body, client=client)
             delivery = Delivery(
