@@ -1,5 +1,5 @@
 {
-  "kinds": ["generic", "odin", "delta", "kropyva", "sap"],
+  "kinds": ["generic", "odin", "delta", "kropyva", "sap", "telegram"],
   "events": ["usage_event_created", "case_opened", "case_closed", "recommendation_created"],
   "excluded": ["oberig"],
   "notes": {
@@ -7,6 +7,7 @@
     "kropyva": "Один GeoJSON Feature — для прямого імпорту на мапу",
     "odin": "C2-envelope з timestamp/actor/subject/geo",
     "sap": "Плоский one-level запис з PascalCase полями",
-    "generic": "Pass-through {event, data} envelope"
+    "generic": "Pass-through {event, data} envelope",
+    "telegram": "Повідомлення в Telegram-чат/канал через Bot API (target_url = chat_id, secret = токен бота)"
   }
 }

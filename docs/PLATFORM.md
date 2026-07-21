@@ -7,7 +7,7 @@
 > впливає на поведінку системи. Якщо ти агент — починай тут.
 
 **Останнє оновлення:** 2026-06-10
-**Поточна версія:** v1.1 + Waves 1–7 (… + proactive signals + mission prep brief)
+**Поточна версія:** v1.1 + Waves 1–8 (… + mission prep brief + Telegram notifications)
 **Активна гілка розробки:** `claude/equipment-tracking-system-3lB6U`
 **Жива демо-версія:** https://yevhen-sh8.github.io/AAR/
 **Робочий деплой (як підняти):** `docs/DEPLOY.md` (Render Blueprint, ~5 хв)
@@ -441,13 +441,31 @@ security / consistency / ux, кожна знахідка → окремий аг
   `learning_metrics.py` + ADR-013 — це sanctioned aggregation pattern, не
   list-endpoint).
 
+### Хвиля 8 — Telegram-канал сповіщень + гайд пілоту
+
+- **Telegram-конектор** поверх наявного webhook-шару (`services/integrations.py`):
+  новий `ConnectorKind.TELEGRAM`. Підписка: `target_url` = chat_id,
+  `secret` = токен бота. Диспетчер для telegram будує людське повідомлення
+  (`_telegram_text`, HTML parse_mode, escape динамічних полів) і постить на
+  `https://api.telegram.org/bot<token>/sendMessage`; **токен лишається в
+  secret і ніколи не потрапляє ні в тіло, ні в підпис-заголовок**. Мінімальна
+  зміна `_post` (гілка на kind) — сигнатура збережена, наявні тести цілі.
+- UI `IntegrationsPage`: для типу telegram поля перепідписуються (Chat ID /
+  Токен бота) + підказка про @BotFather. Demo-mock конектора оновлено.
+- Тест: `test_telegram_dispatch_hits_bot_api_with_message` — правильний
+  URL Bot API, chat_id у тілі, людський текст, токен не в заголовках.
+- **`docs/PILOT.md`** — чек-лист запуску пілоту (Трек A): увімкнення AI,
+  налаштування довідників, фіксація базової лінії, операційний цикл
+  день/тиждень, підключення Telegram, підсумок «до/після» як цифра для
+  постачання.
+
 ---
 
 ## 5. Що НЕ зроблено і чому
 
 | Робота | Стан | Чому відкладено |
 |---|---|---|
-| Реальний messenger-канал нотифікацій (Telegram/Signal) | планується | Webhook-шар готовий (Wave 3); треба лише конкретний адаптер-приймач |
+| Реальний Signal-канал нотифікацій | планується | Telegram-канал реалізовано (Хвиля 8); Signal — за потреби |
 | Шифрування at-rest / point-in-time backup / ротація секретів | планується (Wave 6) | Потребує платного плану Postgres + інфраструктурних рішень замовника; JSON-експорт (Wave 5) — лише проміжна страховка |
 | Live integrations з DELTA/Kropyva (реальні ключі) | поза MVP | Потребує продуктивних ключів і нормативного дозволу |
 | Геопросторовий шар (карта подій) | наступна мінорна | GeoJSON у моделі вже є; треба UI-карта |
