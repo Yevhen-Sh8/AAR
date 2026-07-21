@@ -565,6 +565,32 @@ button.icon-btn:hover { color: var(--accent-red); }
 }
 .sidebar-logout:hover { color: var(--accent-red); border-color: var(--accent-red); }
 
+/* ───── LLM synthesis ───── */
+.synth-subhead {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.synth-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.synth-list li {
+  font-size: 14px;
+  padding-left: 18px;
+  position: relative;
+}
+.synth-list li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: var(--accent-purple);
+}
+
 /* ───── Pre-task signals ───── */
 .signal-cards { display: flex; flex-direction: column; gap: 10px; }
 .signal-review-card {

@@ -74,6 +74,25 @@ relevance / rationale) та `context_assets` (нові закономірнос�
 ти помітив, порівнюючи кейс із базою; типи: {_ASSET_TYPES}). Активи — draft.
 """
 
+MISSION_BRIEF_SYSTEM = f"""\
+Ти — офіцер-планувальник, що готує стислий ПЕРЕДМІСІЙНИЙ брифінг на основі
+агрегованого пакету підготовки (об'єктивна статистика виробів, активні
+проактивні сигнали, валідовані уроки з бази досвіду, відкриті рекомендації).
+
+Відповідь — JSON за схемою:
+- `headline`: ОДНЕ речення — ситуативний підсумок за профілем завдання.
+- `key_risks`: список {{risk, evidence, mitigation}} — головні ризики; у
+  `evidence` посилайся на конкретні дані пакету (стат., сигнал, урок), у
+  `mitigation` — дієве застереження.
+- `precautions`: короткі дієві пункти «зробити ДО вильоту».
+- `confidence_note`: де даних мало або що варто уточнити перед рішенням.
+- `context_assets`: reusable knowledge fragments, які помітив (типи:
+  {_ASSET_TYPES}); лишай draft — людина валідує окремо.
+
+КРИТИЧНО: спирайся ВИКЛЮЧНО на надані дані, не вигадуй фактів поза пакетом.
+Тон — стислий, штабний. Українською мовою.
+"""
+
 
 # -------------------- task-output models ----------------------------------
 
@@ -91,6 +110,19 @@ class AnalogyMatch(BaseModel):
 
 class AnalogyResult(BaseModel):
     matches: list[AnalogyMatch]
+
+
+class SynthRisk(BaseModel):
+    risk: str
+    evidence: str
+    mitigation: str
+
+
+class MissionSynthesis(BaseModel):
+    headline: str
+    key_risks: list[SynthRisk]
+    precautions: list[str]
+    confidence_note: str
 
 
 @dataclass(frozen=True)
@@ -251,6 +283,77 @@ def draft_case_analysis(
     _log_cache(response, "draft")
     return LLMResult(
         task_output=data["markdown"],
+        context_assets=_parse_assets(data.get("context_assets")),
+    )
+
+
+# -------------------- Mission-prep brief synthesis ------------------------
+
+def synthesize_mission_brief(*, brief_payload: dict[str, Any]) -> LLMResult[MissionSynthesis]:
+    """Turn the aggregated Mission Prep Brief into a planner-facing briefing.
+
+    Grounded strictly in the supplied package (stats + signals + lessons +
+    open recommendations). Emits draft context assets it notices (ADR-008 —
+    human validates them separately).
+    """
+    client = _client()
+    s = get_settings()
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "headline": {"type": "string"},
+            "key_risks": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "risk": {"type": "string"},
+                        "evidence": {"type": "string"},
+                        "mitigation": {"type": "string"},
+                    },
+                    "required": ["risk", "evidence", "mitigation"],
+                    "additionalProperties": False,
+                },
+            },
+            "precautions": {"type": "array", "items": {"type": "string"}},
+            "confidence_note": {"type": "string"},
+            "context_assets": _ASSETS_SCHEMA,
+        },
+        "required": [
+            "headline", "key_risks", "precautions", "confidence_note", "context_assets"
+        ],
+        "additionalProperties": False,
+    }
+    response = client.messages.create(
+        model=s.llm_default_model,
+        max_tokens=3072,
+        system=[
+            {
+                "type": "text",
+                "text": MISSION_BRIEF_SYSTEM,
+                "cache_control": {"type": "ephemeral"},
+            },
+        ],
+        output_config={"format": {"type": "json_schema", "schema": schema}},
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    "Сформуй передмісійний брифінг (вхід JSON):\n\n"
+                    f"{json.dumps(brief_payload, ensure_ascii=False, indent=2)}"
+                ),
+            }
+        ],
+    )
+    data = json.loads(next(b.text for b in response.content if b.type == "text"))
+    _log_cache(response, "mission_synth")
+    return LLMResult(
+        task_output=MissionSynthesis(
+            headline=data["headline"],
+            key_risks=[SynthRisk(**r) for r in data["key_risks"]],
+            precautions=data["precautions"],
+            confidence_note=data["confidence_note"],
+        ),
         context_assets=_parse_assets(data.get("context_assets")),
     )
 

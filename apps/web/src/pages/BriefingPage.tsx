@@ -8,6 +8,7 @@ import {
   ListChecks,
   Printer,
   Search,
+  Sparkles,
 } from "lucide-react";
 import { apiFetch, IS_DEMO } from "../lib/api";
 
@@ -45,6 +46,19 @@ interface MissionBrief {
 interface ItemTypeRow {
   code: string;
   name_uk?: string;
+}
+
+interface SynthRisk {
+  risk: string;
+  evidence: string;
+  mitigation: string;
+}
+
+interface MissionSynthesis {
+  headline: string;
+  key_risks: SynthRisk[];
+  precautions: string[];
+  confidence_note: string;
 }
 
 function Section({ title, icon, items, accent }: {
@@ -108,13 +122,31 @@ export default function BriefingPage() {
     enabled: params !== null,
   });
 
+  // LLM synthesis is triggered explicitly (it costs tokens/latency); enabled
+  // only once the planner asks for it, keyed by the same profile params.
+  const [synthOn, setSynthOn] = useState(false);
+  const synth = useQuery({
+    queryKey: ["mission-synth", params],
+    queryFn: () => apiFetch<MissionSynthesis>(`/briefing/mission/synthesis?${params}`),
+    enabled: synthOn && params !== null,
+    retry: false,
+  });
+
   function build() {
     const p = new URLSearchParams();
     if (q.trim()) p.set("q", q.trim());
     if (itemType) p.set("item_type_code", itemType);
     if (operator.trim()) p.set("operator_code", operator.trim());
+    setSynthOn(false);
     setParams(p.toString());
   }
+
+  const synthError =
+    synth.error instanceof Error && synth.error.message.includes("503")
+      ? "ШІ вимкнено на сервері (AAR_LLM_ENABLED). Синтез недоступний."
+      : synth.isError
+        ? "Не вдалося сформувати синтез."
+        : null;
 
   const d = brief.data;
   const msrPct = d ? (d.stats.msr * 100).toFixed(1) : "—";
@@ -128,9 +160,18 @@ export default function BriefingPage() {
             Брифінг підготовки місії
           </span>
           {d && (
-            <button className="secondary" onClick={() => window.print()}>
-              <Printer size={14} /> Друк
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => setSynthOn(true)}
+                disabled={synth.isFetching}
+              >
+                <Sparkles size={14} />{" "}
+                {synth.isFetching ? "ШІ синтезує…" : "Синтез ШІ"}
+              </button>
+              <button className="secondary" onClick={() => window.print()}>
+                <Printer size={14} /> Друк
+              </button>
+            </div>
           )}
         </div>
         <p style={{ color: "var(--text-secondary)", fontSize: 13, marginBottom: 16 }}>
@@ -236,6 +277,69 @@ export default function BriefingPage() {
               </p>
             )}
           </div>
+
+          {(synthOn || synth.data) && (
+            <div className="card" style={{ borderColor: "var(--accent-purple)" }}>
+              <div className="card-header">
+                <span className="card-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Sparkles size={15} style={{ color: "var(--accent-purple)" }} />
+                  Синтез ШІ — тезовий брифінг
+                </span>
+              </div>
+              {synth.isFetching && <div className="loading">ШІ формує брифінг…</div>}
+              {synthError && <div className="error-msg">{synthError}</div>}
+              {synth.data && (
+                <>
+                  <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 14 }}>
+                    {synth.data.headline}
+                  </p>
+
+                  {synth.data.key_risks.length > 0 && (
+                    <>
+                      <div className="synth-subhead">Ключові ризики</div>
+                      <div className="signal-cards" style={{ marginBottom: 14 }}>
+                        {synth.data.key_risks.map((r, i) => (
+                          <div
+                            key={i}
+                            className="signal-review-card"
+                            style={{ borderLeft: "3px solid var(--accent-red)" }}
+                          >
+                            <div style={{ fontWeight: 500 }}>{r.risk}</div>
+                            <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                              Підстава: {r.evidence}
+                            </div>
+                            <div style={{ fontSize: 13, color: "var(--accent-green)", marginTop: 4 }}>
+                              → {r.mitigation}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {synth.data.precautions.length > 0 && (
+                    <>
+                      <div className="synth-subhead">Застереження до вильоту</div>
+                      <ul className="synth-list">
+                        {synth.data.precautions.map((p, i) => (
+                          <li key={i}>{p}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+
+                  {synth.data.confidence_note && (
+                    <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+                      ⓘ {synth.data.confidence_note}
+                    </p>
+                  )}
+                  <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8 }}>
+                    Згенеровано ШІ на основі пакета підготовки — перевір перед рішенням.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
 
           <Section
             title="Активні сигнали (врахуй до вильоту)"

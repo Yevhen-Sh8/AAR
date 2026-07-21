@@ -1,5 +1,6 @@
 """Wave 7 — Mission Prep Brief (docs/concept/positioning.md §5, пункт 3)."""
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -11,6 +12,7 @@ from aar_api.models.context import AssetStatus, ContextAsset, ContextAssetType
 from aar_api.models.dictionaries import ItemType, LossReason, Operator, Zone
 from aar_api.models.event import Item, Outcome, UsageEvent
 from aar_api.models.signal import PreTaskSignal, SignalKind, SignalStatus
+from aar_api.services import llm as llm_service
 
 TODAY = date.today()
 
@@ -175,3 +177,46 @@ async def test_aborted_loss_surfaces_in_loss_reasons() -> None:
         assert st["lost_during_abort"] == 2
         # top_loss_reasons must reflect ALL 3 losses, not just the 1 launched loss.
         assert st["top_loss_reasons"] == ["c (×3)"]
+
+
+async def test_synthesis_returns_503_when_llm_disabled() -> None:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.get("/briefing/mission/synthesis", params={"q": "сектор Б"})
+        assert r.status_code == 503
+        assert "LLM disabled" in r.json()["detail"]
+
+
+async def test_synthesis_with_mocked_llm() -> None:
+    await _seed_world()
+    fake = llm_service.LLMResult(
+        task_output=llm_service.MissionSynthesis(
+            headline="Профіль підвищеного ризику РЕБ у секторі Б.",
+            key_risks=[
+                llm_service.SynthRisk(
+                    risk="Втрати від РЕБ",
+                    evidence="сигнал про нову частоту + урок про нічні втрати",
+                    mitigation="ротація частот, нічна підготовка",
+                )
+            ],
+            precautions=["Перевірити робочу частоту", "Підтвердити нічний навик обслуги"],
+            confidence_note="Мало даних по типу B за профілем.",
+        ),
+        context_assets=[],
+    )
+    with patch.object(llm_service, "synthesize_mission_brief", return_value=fake) as m:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            r = await client.get(
+                "/briefing/mission/synthesis", params={"q": "сектор Б"}
+            )
+            assert r.status_code == 200, r.text
+            body = r.json()
+            assert body["headline"].startswith("Профіль")
+            assert len(body["key_risks"]) == 1
+            assert body["key_risks"][0]["mitigation"]
+            assert len(body["precautions"]) == 2
+            # The service was fed a compact payload built from the computed brief.
+            payload = m.call_args.kwargs["brief_payload"]
+            assert "stats" in payload and "active_signals" in payload
+            assert payload["profile"]["query"] == "сектор Б"

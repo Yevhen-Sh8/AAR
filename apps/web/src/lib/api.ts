@@ -43,6 +43,7 @@ const MOCK_ROUTES: Record<string, string> = {
   "/integrations/connectors": "/integrations-connectors.json",
   "/learning/loop-kpi": "/loop-kpi.json",
   "/signals": "/signals.json",
+  "/briefing/mission/synthesis": "/briefing-synthesis.json",
   "/briefing/mission": "/briefing.json",
 };
 

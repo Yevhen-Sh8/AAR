@@ -397,10 +397,22 @@ seed, тож зміна `AAR_ADMIN_PASSWORD` у Render **не мала жодн�
 - `BriefingPage` («Брифінг місії», перший пункт секції AAR): форма профілю,
   картка статистики, 4 секції з кольоровим кодуванням, кнопка друку.
   Demo-mock `briefing.json`.
-- Тести: `test_mission_brief.py` (4) — фільтрація статистики за
+- **LLM-синтез поверх брифінгу** (`GET /briefing/mission/synthesis`):
+  `services/llm.py::synthesize_mission_brief` перетворює агрегований пакет
+  у планувальницький тезовий брифінг — `headline`, `key_risks`
+  (risk/evidence/mitigation, кожен зі згадкою даних пакету),
+  `precautions`, `confidence_note`. Той самий патерн, що й решта LLM
+  (LLMResult[T], structured output, cache_control ephemeral на system-блоці);
+  draft-активи, які помітив, персистяться (ADR-008, дія користувача). Gated:
+  503 при вимкненому LLM. GET-triggers-LLM — як `/llm/cases/{id}/analogies`.
+  UI: кнопка «Синтез ШІ» на `BriefingPage` (фіолетова картка з ризиками й
+  застереженнями), demo-mock `briefing-synthesis.json`. **Спирається
+  ВИКЛЮЧНО на дані пакету** (промпт забороняє вигадувати факти).
+- Тести: `test_mission_brief.py` (6) — фільтрація статистики за
   типом/вікном з абортами окремо; ранжування за запитом (dismissed-сигнали
   й draft-активи не показуються); режим без запиту; втрати під час абортів
-  у top_loss_reasons.
+  у top_loss_reasons; синтез 503 при вимкненому LLM; синтез happy-path
+  (mocked) з перевіркою compact-payload.
 - Виправлено під час розробки: двоентітний `select(...)` через
   `.scalars()` мовчки губить другу сутність — замінено на `.execute()`.
 
