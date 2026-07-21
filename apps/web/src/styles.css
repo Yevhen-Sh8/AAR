@@ -565,6 +565,25 @@ button.icon-btn:hover { color: var(--accent-red); }
 }
 .sidebar-logout:hover { color: var(--accent-red); border-color: var(--accent-red); }
 
+/* ───── Geo map ───── */
+.map-wrap { display: flex; flex-direction: column; gap: 8px; }
+.map-svg {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-input);
+}
+.map-note { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+.map-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
 /* ───── LLM synthesis ───── */
 .synth-subhead {
   font-size: 12px;

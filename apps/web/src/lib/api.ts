@@ -30,6 +30,7 @@ const MOCK_ROUTES: Record<string, string> = {
   "/reports/monthly": "/monthly.json",
   "/reports/daily": "/daily.json",
   "/aar/cases": "/cases.json",
+  "/events/geojson": "/events-geojson.json",
   "/events": "/events.json",
   "/dictionaries/operators": "/operators.json",
   "/dictionaries/loss-reasons": "/loss-reasons.json",

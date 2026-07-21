@@ -16,6 +16,7 @@ import {
   LogOut,
   Megaphone,
   ClipboardList,
+  Map as MapIcon,
 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { installAutoSync } from "./lib/sync";
@@ -41,6 +42,7 @@ const DictionariesPage = lazy(() => import("./pages/DictionariesPage"));
 const LearningLoopPage = lazy(() => import("./pages/LearningLoopPage"));
 const SignalsPage = lazy(() => import("./pages/SignalsPage"));
 const BriefingPage = lazy(() => import("./pages/BriefingPage"));
+const MapPage = lazy(() => import("./pages/MapPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -50,6 +52,7 @@ const NAV = [
   { section: "Аналітика" },
   { to: "/", icon: LayoutDashboard, label: "Дашборд" },
   { to: "/events", icon: Zap, label: "Події" },
+  { to: "/map", icon: MapIcon, label: "Геокарта" },
   { to: "/event-form", icon: FilePlus, label: "Подати подію" },
   { to: "/import", icon: Upload, label: "Імпорт CSV/XLSX" },
   { section: "AAR" },
@@ -142,6 +145,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/events" element={<EventsPage />} />
+              <Route path="/map" element={<MapPage />} />
               <Route path="/event-form" element={<EventForm />} />
               <Route path="/import" element={<ImportPage />} />
               <Route path="/briefing" element={<BriefingPage />} />

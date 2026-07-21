@@ -115,6 +115,70 @@ async def list_events(
     return list(rows)
 
 
+@router.get("/geojson")
+async def events_geojson(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    operator_code: str | None = Query(default=None),
+    item_type_code: str | None = Query(default=None),
+    outcome: Outcome | None = Query(default=None),
+    limit: int = Query(default=2000, le=5000),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Geolocated events as a GeoJSON FeatureCollection for the map UI.
+
+    Only events with a non-null Point location are returned; properties carry
+    human codes (serial / operator / item type) for tooltips, plus outcome for
+    colour-coding.
+    """
+    stmt = (
+        select(
+            UsageEvent.id,
+            UsageEvent.event_date,
+            UsageEvent.outcome,
+            UsageEvent.location,
+            Item.serial_no,
+            ItemType.code.label("item_type_code"),
+            Operator.code.label("operator_code"),
+        )
+        .join(Item, Item.id == UsageEvent.item_id)
+        .join(ItemType, ItemType.id == Item.item_type_id)
+        .join(Operator, Operator.id == UsageEvent.operator_id)
+        .where(UsageEvent.location.is_not(None))
+    )
+    if date_from:
+        stmt = stmt.where(UsageEvent.event_date >= date_from)
+    if date_to:
+        stmt = stmt.where(UsageEvent.event_date <= date_to)
+    if operator_code:
+        stmt = stmt.where(Operator.code == operator_code)
+    if item_type_code:
+        stmt = stmt.where(ItemType.code == item_type_code)
+    if outcome:
+        stmt = stmt.where(UsageEvent.outcome == outcome)
+    stmt = stmt.order_by(UsageEvent.event_date.desc(), UsageEvent.id.desc()).limit(limit)
+
+    features: list[dict[str, Any]] = []
+    for row in await session.execute(stmt):
+        loc = row.location
+        if not loc or loc.get("type") != "Point":
+            continue
+        oc = row.outcome.value if hasattr(row.outcome, "value") else str(row.outcome)
+        features.append({
+            "type": "Feature",
+            "geometry": loc,
+            "properties": {
+                "id": row.id,
+                "serial_no": row.serial_no,
+                "operator_code": row.operator_code,
+                "item_type_code": row.item_type_code,
+                "outcome": oc,
+                "event_date": row.event_date.isoformat(),
+            },
+        })
+    return {"type": "FeatureCollection", "features": features, "count": len(features)}
+
+
 class ImportRowError(BaseModel):
     row: int
     message: str
