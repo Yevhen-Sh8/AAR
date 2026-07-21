@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList, Printer, Search } from "lucide-react";
-import { apiFetch } from "../lib/api";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ClipboardList,
+  FolderKanban,
+  ListChecks,
+  Printer,
+  Search,
+} from "lucide-react";
+import { apiFetch, IS_DEMO } from "../lib/api";
 
 interface ProfileStats {
   window_days: number;
   launched: number;
   success: number;
   lost: number;
+  lost_during_abort: number;
   repaired: number;
   aborted: number;
   msr: number;
@@ -33,15 +42,23 @@ interface MissionBrief {
   open_recommendations: BriefItem[];
 }
 
-function Section({ title, items, accent }: {
+interface ItemTypeRow {
+  code: string;
+  name_uk?: string;
+}
+
+function Section({ title, icon, items, accent }: {
   title: string;
+  icon: React.ReactNode;
   items: BriefItem[];
   accent: string;
 }) {
   return (
     <div className="card">
       <div className="card-header">
-        <span className="card-title">{title}</span>
+        <span className="card-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {icon} {title}
+        </span>
         <span className="card-badge badge-blue">{items.length}</span>
       </div>
       {items.length === 0 ? (
@@ -75,7 +92,15 @@ export default function BriefingPage() {
   const [q, setQ] = useState("");
   const [itemType, setItemType] = useState("");
   const [operator, setOperator] = useState("");
-  const [params, setParams] = useState<string | null>(null);
+  // In demo mode auto-run one fetch on mount so the static showcase has
+  // content immediately, matching sibling demo pages; live mode waits for
+  // the planner to enter a profile first.
+  const [params, setParams] = useState<string | null>(IS_DEMO ? "" : null);
+
+  const itemTypes = useQuery({
+    queryKey: ["dict", "/dictionaries/item-types"],
+    queryFn: () => apiFetch<ItemTypeRow[]>("/dictionaries/item-types"),
+  });
 
   const brief = useQuery({
     queryKey: ["mission-brief", params],
@@ -133,8 +158,12 @@ export default function BriefingPage() {
               onChange={(e) => setItemType(e.target.value)}
             >
               <option value="">Будь-який</option>
-              <option value="A">A</option>
-              <option value="B">B</option>
+              {(itemTypes.data ?? []).map((it) => (
+                <option key={it.code} value={it.code}>
+                  {it.code}
+                  {it.name_uk ? ` — ${it.name_uk}` : ""}
+                </option>
+              ))}
             </select>
           </label>
           <label>
@@ -182,7 +211,14 @@ export default function BriefingPage() {
               </div>
               <div className="stat-item">
                 <div className="stat-label">Втрачено</div>
-                <div className="stat-value" style={{ color: "var(--accent-red)" }}>{d.stats.lost}</div>
+                <div className="stat-value" style={{ color: "var(--accent-red)" }}>
+                  {d.stats.lost}
+                  {d.stats.lost_during_abort > 0 && (
+                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                      {" "}(+{d.stats.lost_during_abort} під час абортів)
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="stat-item">
                 <div className="stat-label">Ремонт</div>
@@ -202,22 +238,26 @@ export default function BriefingPage() {
           </div>
 
           <Section
-            title="⚠ Активні сигнали (врахуй до вильоту)"
+            title="Активні сигнали (врахуй до вильоту)"
+            icon={<AlertTriangle size={15} style={{ color: "var(--accent-gold)" }} />}
             items={d.signals}
             accent="var(--accent-gold)"
           />
           <Section
-            title="✓ Валідовані уроки з бази досвіду"
+            title="Валідовані уроки з бази досвіду"
+            icon={<CheckCircle2 size={15} style={{ color: "var(--accent-green)" }} />}
             items={d.validated_lessons}
             accent="var(--accent-green)"
           />
           <Section
             title="Уроки з завершених AAR-кейсів"
+            icon={<FolderKanban size={15} style={{ color: "var(--accent-blue)" }} />}
             items={d.case_lessons}
             accent="var(--accent-blue)"
           />
           <Section
             title="Відкриті рекомендації (ще не впроваджено)"
+            icon={<ListChecks size={15} style={{ color: "var(--accent-red)" }} />}
             items={d.open_recommendations}
             accent="var(--accent-red)"
           />

@@ -32,6 +32,14 @@ from aar_api.models.signal import PreTaskSignal, SignalStatus
 
 _TOKEN_RE = re.compile(r"[\wа-яіїєґА-ЯІЇЄҐ]{3,}", re.UNICODE)
 
+# Safety cap on candidate rows loaded per section before scoring. Generous —
+# far above realistic pilot counts of open signals / validated assets / open
+# cases / open recommendations — but prevents pathological memory use if the
+# base ever grows unexpectedly. The window-scoped event scan for stats follows
+# the same on-the-fly aggregation pattern as services/learning_metrics.py
+# (sanctioned by ADR-013 at pilot scale).
+_CANDIDATE_CAP = 500
+
 
 def _tokens(query: str) -> list[str]:
     return [t.lower() for t in _TOKEN_RE.findall(query or "")]
@@ -48,7 +56,8 @@ class ProfileStats:
     window_days: int
     launched: int = 0
     success: int = 0
-    lost: int = 0
+    lost: int = 0            # non-aborted losses (pairs with launched for MSR)
+    lost_during_abort: int = 0  # losses that happened during an aborted sortie
     repaired: int = 0
     aborted: int = 0
     msr: float = 0.0
@@ -88,7 +97,9 @@ async def compute_mission_brief(
 ) -> MissionBrief:
     tokens = _tokens(query)
     today = today or date.today()
-    since = today - timedelta(days=window_days)
+    # N-day-inclusive window, matching the triggers.py convention (a 7-day
+    # brief and a 7-day trigger window then agree on the same events).
+    since = today - timedelta(days=window_days - 1)
 
     def rank(items: list[BriefItem]) -> list[BriefItem]:
         # With a query: relevance first (drop zero-hits), newest as tiebreak.
@@ -101,11 +112,14 @@ async def compute_mission_brief(
     # ── 1. Активні сигнали (до завдання) ──────────────────────────────────
     signal_rows = list(
         await session.scalars(
-            select(PreTaskSignal).where(
+            select(PreTaskSignal)
+            .where(
                 PreTaskSignal.status.in_(
                     [SignalStatus.NEW, SignalStatus.ACKNOWLEDGED, SignalStatus.ACCEPTED]
                 )
             )
+            .order_by(PreTaskSignal.id.desc())
+            .limit(_CANDIDATE_CAP)
         )
     )
     signals = rank([
@@ -123,7 +137,10 @@ async def compute_mission_brief(
     # ── 2. Валідовані уроки з бази досвіду (ADR-009: тільки validated) ────
     asset_rows = list(
         await session.scalars(
-            select(ContextAsset).where(ContextAsset.status == AssetStatus.VALIDATED)
+            select(ContextAsset)
+            .where(ContextAsset.status == AssetStatus.VALIDATED)
+            .order_by(ContextAsset.id.desc())
+            .limit(_CANDIDATE_CAP)
         )
     )
     validated_lessons = rank([
@@ -141,10 +158,13 @@ async def compute_mission_brief(
     # ── 3. Уроки з кейсів, що пройшли валідацію циклу ─────────────────────
     case_rows = list(
         await session.scalars(
-            select(AARCase).where(
+            select(AARCase)
+            .where(
                 AARCase.lesson_identified.is_not(None),
                 AARCase.status.in_([CaseStatus.VALIDATED, CaseStatus.CLOSED]),
             )
+            .order_by(AARCase.id.desc())
+            .limit(_CANDIDATE_CAP)
         )
     )
     case_lessons = rank([
@@ -170,6 +190,8 @@ async def compute_mission_brief(
                     [RecommendationStatus.PROPOSED, RecommendationStatus.IN_PROGRESS]
                 )
             )
+            .order_by(Recommendation.id.desc())
+            .limit(_CANDIDATE_CAP)
         )
     )
     open_recommendations = rank([
@@ -191,7 +213,7 @@ async def compute_mission_brief(
         .join(ItemType, ItemType.id == Item.item_type_id)
         .join(Operator, Operator.id == UsageEvent.operator_id)
         .join(LossReason, LossReason.id == UsageEvent.loss_reason_id, isouter=True)
-        .where(UsageEvent.event_date >= since)
+        .where(UsageEvent.event_date >= since, UsageEvent.event_date <= today)
     )
     if item_type_code:
         ev_stmt = ev_stmt.where(ItemType.code == item_type_code)
@@ -202,16 +224,23 @@ async def compute_mission_brief(
     stats = ProfileStats(window_days=window_days)
     loss_counter: dict[str, int] = {}
     for ev, loss_code in ev_rows:
+        is_loss = ev.outcome == Outcome.LOST
+        # Every real loss feeds the risk signal — including losses during an
+        # aborted sortie (ADR-012 allows aborted+lost, e.g. downed while
+        # returning after an EW abort). Otherwise an EW-heavy profile would
+        # brief as lost=0, hiding the very risk the brief exists to surface.
+        if is_loss and loss_code:
+            loss_counter[loss_code] = loss_counter.get(loss_code, 0) + 1
         if ev.aborted:
             stats.aborted += 1
+            if is_loss:
+                stats.lost_during_abort += 1
             continue
         stats.launched += 1
         if ev.outcome == Outcome.SUCCESS:
             stats.success += 1
-        elif ev.outcome == Outcome.LOST:
+        elif is_loss:
             stats.lost += 1
-            if loss_code:
-                loss_counter[loss_code] = loss_counter.get(loss_code, 0) + 1
         elif ev.outcome == Outcome.REPAIR:
             stats.repaired += 1
     stats.msr = round(stats.success / stats.launched, 4) if stats.launched else 0.0

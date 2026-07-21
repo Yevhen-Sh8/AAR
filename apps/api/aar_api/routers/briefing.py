@@ -16,6 +16,7 @@ class ProfileStatsOut(BaseModel):
     launched: int
     success: int
     lost: int
+    lost_during_abort: int
     repaired: int
     aborted: int
     msr: float

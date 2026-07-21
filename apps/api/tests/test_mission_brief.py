@@ -136,3 +136,42 @@ async def test_brief_without_query_returns_latest_open_items() -> None:
         # Без запиту — всі відкриті сигнали (2 з 3; dismissed схований).
         assert len(body["signals"]) == 2
         assert len(body["validated_lessons"]) == 2  # обидва validated, draft — ні
+
+
+async def test_aborted_loss_surfaces_in_loss_reasons() -> None:
+    """A loss during an aborted sortie (ADR-012 allows aborted+lost) must still
+    appear in top_loss_reasons and lost_during_abort — otherwise an EW-heavy
+    profile briefs as lost=0, hiding the exact risk the brief exists to show."""
+    Session = async_sessionmaker(_engine, expire_on_commit=False)
+    async with Session() as s:
+        a = ItemType(code="A", name_uk="A")
+        op = Operator(code="E-01", name_uk="01")
+        lr = LossReason(code="c", name_uk="c", zone=Zone.OPERATOR)
+        s.add_all([a, op, lr])
+        await s.flush()
+        items = [Item(serial_no=f"A-{i:05d}", item_type_id=a.id) for i in range(4)]
+        s.add_all(items)
+        await s.flush()
+        s.add_all([
+            # 1 clean launch+success, 1 non-aborted loss(c), 2 aborted losses(c).
+            UsageEvent(item_id=items[0].id, operator_id=op.id,
+                       event_date=TODAY, outcome=Outcome.SUCCESS),
+            UsageEvent(item_id=items[1].id, operator_id=op.id,
+                       event_date=TODAY, outcome=Outcome.LOST, loss_reason_id=lr.id),
+            UsageEvent(item_id=items[2].id, operator_id=op.id,
+                       event_date=TODAY, outcome=Outcome.LOST,
+                       loss_reason_id=lr.id, aborted=True, abort_reason="ew_jam"),
+            UsageEvent(item_id=items[3].id, operator_id=op.id,
+                       event_date=TODAY, outcome=Outcome.LOST,
+                       loss_reason_id=lr.id, aborted=True, abort_reason="ew_jam"),
+        ])
+        await s.commit()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        st = (await client.get("/briefing/mission")).json()["stats"]
+        assert st["launched"] == 2          # 1 success + 1 non-aborted loss
+        assert st["lost"] == 1              # non-aborted losses only
+        assert st["aborted"] == 2
+        assert st["lost_during_abort"] == 2
+        # top_loss_reasons must reflect ALL 3 losses, not just the 1 launched loss.
+        assert st["top_loss_reasons"] == ["c (×3)"]
