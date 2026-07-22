@@ -7,7 +7,7 @@
 > впливає на поведінку системи. Якщо ти агент — починай тут.
 
 **Останнє оновлення:** 2026-06-10
-**Поточна версія:** v1.1 + Waves 1–9 (… + Telegram notifications + geo map)
+**Поточна версія:** v1.1 + Waves 1–10 (… + Telegram notifications + geo map + dictionary CRUD)
 **Активна гілка розробки:** `claude/equipment-tracking-system-3lB6U`
 **Жива демо-версія:** https://yevhen-sh8.github.io/AAR/
 **Робочий деплой (як підняти):** `docs/DEPLOY.md` (Render Blueprint, ~5 хв)
@@ -474,6 +474,20 @@ security / consistency / ux, кожна знахідка → окремий аг
   Лінійна проєкція lon/lat на viewBox за bbox даних, graticule з підписами,
   точки за кольором outcome (успіх/втрата/ремонт), фільтри, tooltip і
   панель деталей по кліку. Demo-mock `events-geojson.json`.
+
+### Хвиля 10 — CRUD довідників через UI
+
+- `routers/dictionaries.py` розширено з read-only до повного CRUD для всіх
+  чотирьох довідників (типи виробів, експлуатанти, причини втрат/ремонтів):
+  `POST` / `PATCH` / `DELETE`, запис лише для ролі `admin` (`require_role`).
+- `code` унікальний і **незмінний після створення** (дублікат → 409);
+  редагуються назва, зона, вартість.
+- **Захист посилальної цілісності:** `DELETE` → 409, якщо на код посилаються
+  події/предмети/кейси — класифікатор не можна прибрати з-під наявного обліку.
+- Кожен запис іде в audit hash-chain (`DICTIONARY_CREATED/UPDATED/DELETED`).
+- Фронтенд `DictionariesPage` — інлайн додавання/редагування/видалення в таблиці;
+  у demo лише читання. Побіжно виправлено баг відображення назв (`name` → `name_uk`).
+- Тести: `test_dictionaries.py` (3).
 
 ---
 

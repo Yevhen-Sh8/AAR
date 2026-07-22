@@ -37,6 +37,9 @@ class AuditAction(StrEnum):
     SIGNAL_CREATED = "signal.created"
     SIGNAL_REVIEWED = "signal.reviewed"
     SIGNAL_CONVERTED = "signal.converted"
+    DICTIONARY_CREATED = "dictionary.created"
+    DICTIONARY_UPDATED = "dictionary.updated"
+    DICTIONARY_DELETED = "dictionary.deleted"
 
 
 class AuditLog(Base):
