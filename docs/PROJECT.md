@@ -28,6 +28,9 @@
 | NATO LL ↔ AAR | [`docs/normative/nato-ll.md`](normative/nato-ll.md) |
 | Що ще не покрито | [`docs/normative/gap-analysis.md`](normative/gap-analysis.md) |
 | ISO/IEC 27001 контролі | [`docs/normative/iso-27001-controls.md`](normative/iso-27001-controls.md) |
+| Як розгорнути робочий контур | [`docs/DEPLOY.md`](DEPLOY.md) |
+| Як запустити пілот (чек-лист, базова лінія) | [`docs/PILOT.md`](PILOT.md) |
+| Увімкнення ШІ + які дані виходять у LLM-API | [`docs/AI_ENABLEMENT.md`](AI_ENABLEMENT.md) |
 | Історія змін | [`CHANGELOG.md`](../CHANGELOG.md) |
 
 ## 3. Поточний статус
