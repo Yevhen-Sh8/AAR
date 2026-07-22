@@ -30,6 +30,7 @@
 | ISO/IEC 27001 контролі | [`docs/normative/iso-27001-controls.md`](normative/iso-27001-controls.md) |
 | Як розгорнути робочий контур | [`docs/DEPLOY.md`](DEPLOY.md) |
 | Як запустити пілот (чек-лист, базова лінія) | [`docs/PILOT.md`](PILOT.md) |
+| Швидкий старт за ролями (що кому тиснути) | [`docs/QUICKSTART_ROLES.md`](QUICKSTART_ROLES.md) |
 | Увімкнення ШІ + які дані виходять у LLM-API | [`docs/AI_ENABLEMENT.md`](AI_ENABLEMENT.md) |
 | Історія змін | [`CHANGELOG.md`](../CHANGELOG.md) |
 
