@@ -66,6 +66,41 @@
 - `docs/PROJECT.md` §2 — карта документації доповнена рядками DEPLOY / PILOT /
   AI_ENABLEMENT.
 
+## [Хвилі 1–10 — пост-релізний трек v1.1 → v1.8.0]
+
+> Консолідований backfill: під час хвиль журнал вівся у `docs/PLATFORM.md` §4
+> (детально) і в аркуші змін паспорта (`docs/passport/01-pasport-programy.md`
+> §11). Нижче — стислий перелік для цілісності CHANGELOG.
+
+### Added
+- **Хвиля 1** — NATO-цикл AAR-кейсу (open→…→closed), автовалідація/регресія
+  рекомендацій за рецидивом сигнатури, «Висновки доби».
+- **Хвиля 2** — мета-KPI циклу навчання (time-to-validation, LI→LL, recurrence,
+  OPR-навантаження); розрізнення MSR-narrow/full (`aborted`); cost-per-effect.
+- **Хвиля 3** — анонімні звіти (blame-free), розсилка форм учасникам,
+  вебхуки на події кейсів; видалено рудимент `KnowledgeEntry`.
+- **Хвиля 4** — робочий деплой (Render Blueprint), self-migrate + idempotent
+  seed на старті, live/demo-режими.
+- **Хвиля 5** — автентифікація JWT + глобальний auth-gate, rate-limit входу,
+  security-заголовки (CSP/HSTS/X-Frame-Options), admin JSON-бекап, code-splitting.
+- **Хвиля 6** — проактивні сигнали до виконання завдання (`PreTaskSignal`,
+  ескалація в кейс).
+- **Хвиля 7** — брифінг підготовки місії + LLM-синтез; багатоагентне ревʼю
+  з адверсарною верифікацією.
+- **Хвиля 8** — Telegram-сповіщення (`ConnectorKind.telegram`, Bot API;
+  токен лише в `secret`, без HMAC у тілі).
+- **Хвиля 9** — геокарта подій (`GET /events/geojson` + самодостатній SVG-плот
+  без зовнішніх тайл-серверів, ADR-022).
+- **Хвиля 10** — CRUD довідників через UI (admin) з audit hash-chain і захистом
+  видалення (409 при використанні коду).
+
+### Security
+- Міграція JWT з `python-jose` на **PyJWT** — прибрано транзитивну вразливу
+  залежність `ecdsa` (PYSEC-2026-1325); підпис лишається HS256.
+
+### Migrations
+- Alembic `0003`–`0010` (NATO-поля кейсу, context assets, auth, pre-task signals тощо).
+
 ## [v1.1.0-context-accumulation] — 2026-05-13
 
 ### Added (Етап 11 — Context Accumulation Layer)
