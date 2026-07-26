@@ -102,15 +102,71 @@ pilot-інстансу, не для розподіленої атаки.
 | `AAR_LOGIN_RATE_LIMIT_ATTEMPTS` | Спроб входу на вікно | `20` |
 | `AAR_LOGIN_RATE_LIMIT_WINDOW_SECONDS` | Тривалість вікна (с) | `300` |
 
-## Альтернатива: локально через Docker Compose
+## Локальний перегляд через Docker Compose (найшвидше «подивитись»)
 
-Якщо потрібен повний контур у себе (on-prem):
+Повний контур у себе, однією командою:
 ```bash
 cd infra
-docker compose up
-# API: http://localhost:8000/api · Web: http://localhost:8080
+docker compose up --build      # перший раз збирає образи (~2–4 хв)
+# Веб:  http://localhost:8080
+# API:  http://localhost:8000/api  (доки: http://localhost:8000/api/docs)
 ```
-Compose сам піднімає Postgres + Redis + api + web і застосовує міграції.
+Compose піднімає Postgres + Redis + api + web. `api` через `start.sh` **сам
+застосовує міграції й засідає демо-дані** (`AAR_SEED_ON_START=true` у compose):
+створюється bootstrap-адмін і ~3000 синтетичних подій — стенд одразу робочий.
+
+**Вхід:** `admin@aar.local` / `aar-admin-2026` (значення `AAR_ADMIN_EMAIL` /
+`AAR_ADMIN_PASSWORD` у `infra/docker-compose.yml` — змініть за потреби).
+
+Порожня БД без демо-даних: у compose постав `AAR_SEED_ON_START: "false"`.
+Скинути все (видалити том БД): `docker compose down -v`.
+
+> Потрібен лише встановлений Docker Desktop / Docker Engine + compose-плагін.
+> Це найкращий варіант «побачити, що вийшло» без жодного хостингу.
+
+## Self-hosted VM (постійний публічний демо замість Render/Vercel)
+
+Коли безкоштовні хостинги відпали, найдешевший стабільний варіант — маленька
+VM із тим самим compose за реверс-проксі Caddy (авто-HTTPS Let's Encrypt).
+
+**Параметри VM (мінімум):** 1 vCPU / 2 ГБ RAM / 20 ГБ SSD, Ubuntu 22.04/24.04.
+Приклади: Hetzner CX22 (~€4/міс), DigitalOcean/Vultr basic (~$6/міс),
+Fly.io/Railway paid. Для 2 ГБ RAM вистачає; при seed-збірці 1 ГБ буває впритул.
+
+**Кроки:**
+```bash
+# 1) на VM: поставити Docker + compose-плагін
+curl -fsSL https://get.docker.com | sh
+
+# 2) отримати код
+git clone https://github.com/Yevhen-Sh8/AAR.git && cd AAR/infra
+
+# 3) ЗМІНИТИ секрети у docker-compose.yml перед підняттям:
+#    AAR_JWT_SECRET (довгий випадковий), AAR_ADMIN_PASSWORD,
+#    POSTGRES_PASSWORD + відповідний AAR_DATABASE_URL.
+#    Для публічного демо лишайте AAR_SEED_ON_START=true (лише СИНТЕТИЧНІ дані).
+
+# 4) підняти у фоні
+docker compose up -d --build
+```
+
+**HTTPS + домен (Caddy).** Додайте в `infra/docker-compose.yml` сервіс:
+```yaml
+  caddy:
+    image: caddy:2-alpine
+    depends_on: [web]
+    ports: ["80:80", "443:443"]
+    command: caddy reverse-proxy --from https://demo.example.com --to web:80
+    volumes: ["caddy_data:/data"]
+# і додайте `caddy_data:` у розділ volumes.
+```
+Наведіть A-запис `demo.example.com` на IP VM — Caddy сам випустить сертифікат.
+Тоді приберіть публічний проброс порту 8080 у `web` (лишіть лише всередині
+compose-мережі), щоб зовні був тільки HTTPS.
+
+> ⚠ Оборонний контекст: публічний VM-демо тримайте **виключно на синтетичних
+> даних**. Реальні операційні дані — лише в закритому контурі замовника
+> (приватна мережа/VPN, без публічного URL, ISO 27001 — див. нижче).
 
 ## Альтернатива: Fly.io / Railway
 

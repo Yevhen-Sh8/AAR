@@ -38,24 +38,24 @@
 ## 3. Поточний статус
 
 - **Версія концепції**: v2.0
-- **Поточний етап**: Етап 11 v1.1 — Context Accumulation Layer **реалізовано**.
-  Запит на код-ревʼю в гілці `claude/equipment-tracking-system-3lB6U`.
-- v1.0.0 змерджено в `main` — pilot-ready; реліз
-  https://github.com/Yevhen-Sh8/AAR/releases/tag/v1.0.0
+- **Версія продукту**: **v1.8.0** (єдина для api/web — `pyproject.toml`,
+  `aar_api/__init__.py`, `SettingsPage.tsx`).
+- **Стан**: v1.0/v1.1 + Хвилі 1–10 змерджено в `main` — pilot-ready.
+  Детальний перелік реалізованого — `docs/PLATFORM.md` §4; історія — `CHANGELOG.md`.
 - **Найближчі дії**:
-  - Merge v1.1 у `main` після ревʼю → випустити v1.1.0.
-  - На стороні замовника — pilot deployment v1.0/v1.1, restore-drill,
-    звірка експортів № 440.
-- **Що вже є**:
-  - 11 моделей: `User`, `ItemType`, `Operator`, `LossReason`, `RepairReason`,
-    `Item`, `UsageEvent`, `AARCase`, `IndividualReport`, `Recommendation`,
-    `KnowledgeEntry`.
-  - Дві Alembic-міграції: `0001_initial` (users), `0002_data_model` (решта).
-  - REST API: `GET /dictionaries/{item-types,operators,loss-reasons,repair-reasons}`,
-    `POST /events`, `GET /events` із фільтрами по даті/експлуатанту/результату.
-  - Seed-скрипт `python -m aar_api.scripts.seed` генерує синтетику листопад–грудень
-    (10 експлуатантів × ~60 діб × 2–8 пусків/добу ≈ 3000 подій).
-  - PWA + Dockerfile-и + docker-compose; CI зелений (ruff/mypy/pytest/build).
+  - Пілот у замовника (див. `docs/PILOT.md`), увімкнення ШІ за потреби
+    (`docs/AI_ENABLEMENT.md`), замір «до/після» (`docs/BEFORE_AFTER_TEMPLATE.md`).
+  - Бэклог: Signal-канал, live DELTA/Kropyva, прод-хардеринг (at-rest/PITR).
+- **Що вже є (стисло)**:
+  - Дворівнева модель (події → AAR-кейси, цикл NATO), тригери T1–T5,
+    авто-валідація рекомендацій, Context Accumulation Layer (ADR-007/008/009),
+    проактивні сигнали, брифінг місії + ШІ-синтез, цикл навчання (мета-KPI),
+    геокарта подій, CRUD довідників (admin), audit hash-chain.
+  - 10 Alembic-міграцій (`0001`–`0010`). `KnowledgeEntry` видалено (Хвиля 3).
+  - Інтеграції: generic/ODIN/DELTA/Kropyva/SAP + Telegram (**Оберіг виключено**).
+  - JWT-авторизація (PyJWT/HS256), rate-limit логіну, security-заголовки,
+    admin JSON-бекап.
+  - PWA offline-first; CI зелений (ruff/mypy/pytest/vitest/build).
 
 ## 4. Стек і середовище (узгоджено)
 
@@ -81,19 +81,26 @@
 | Адміністратор | Веде довідники, керує доступом |
 | Системний інтегратор | Налаштовує CSV/REST джерела даних |
 
-## 6. Ключові архітектурні рішення (ADR-light)
+## 6. Ключові архітектурні рішення (ADR)
 
-| # | Рішення | Чому |
-|---|---|---|
-| ADR-001 | Python + FastAPI для бекенду | Швидкий старт, інтеграція з Claude SDK, аналітика на pandas |
-| ADR-002 | PWA замість нативного мобільного | Один кодбейс, offline-first, простіше розгортання |
-| ADR-003 | Дворівнева модель (події + кейси) | Розділяє кількісний і якісний шар, як радить NATO LL |
-| ADR-004 | LLM-класифікація з людською валідацією | Не довіряємо моделі сліпо; зберігаємо первинний текст |
-| ADR-005 | Append-only events + hash-chain | Цілісність обліку (ISO 27001 A.8) і вимоги наказу № 440 |
-| ADR-006 | ISO 27001/27002 замість КСЗІ | Актуальна практика 2025–2026 |
-| ADR-007 | Модель «двох результатів» LLM (Task Output + Context Asset) | Реалізує NATO LL цикл O→LL→Institutionalization; стаття Klochnyk 2026 |
-| ADR-008 | `ContextAsset.status` default = `draft`, validation тільки людиною | Уникнення «scaling mistakes» |
-| ADR-009 | `find_analogies` шукає тільки серед `validated` активів | shared context ≠ shared confusion |
+> **Канонічний журнал ADR (ADR-001…022) — `docs/PLATFORM.md` §6.**
+> Щоб уникнути двох розбіжних нумерацій, тут не ведеться власна — нижче лише
+> засадничі рішення концепт-фази (без наскрізних номерів); повний журнал із
+> рішеннями хвиль 1–10 дивись у канонічному місці.
+
+Засадничі рішення (концепт-фаза):
+- **Python + FastAPI** для бекенду — швидкий старт, інтеграція з Claude SDK,
+  аналітика на pandas.
+- **PWA замість нативного мобільного**, offline-first — один кодбейс, робота
+  без звʼязку в полі (= ADR-006 канонічного журналу).
+- **Дворівнева модель** (події → кейси) — розділяє кількісний і якісний шар,
+  як радить NATO LL (= ADR-005).
+- **LLM-класифікація з людською валідацією** — не довіряємо моделі сліпо;
+  зберігаємо первинний текст (= ADR-008: активи стартують як `draft`).
+- **Append-only events + hash-chain** — цілісність обліку (ISO 27001 A.8) і
+  вимоги наказу № 440.
+- **ISO 27001/27002 замість КСЗІ** — актуальна практика (= ADR-004).
+- **Дворезультатний LLM-патерн** `LLMResult[T]` — ADR-007/008/009 канонічного журналу.
 
 ## 7. Правила підтримки документації
 

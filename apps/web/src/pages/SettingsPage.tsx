@@ -18,10 +18,15 @@ const FEATURES = [
   { key: "JWT auth + login rate limiting", state: "available", note: "/auth/login, 20 спроб/5 хв на IP" },
   { key: "Security response headers", state: "available", note: "CSP, X-Frame-Options, HSTS, тощо" },
   { key: "Admin JSON backup export", state: "available", note: "/admin/export, browser-only" },
+  { key: "Проактивні сигнали (до завдання)", state: "available", note: "/signals, ескалація в AAR-кейс" },
+  { key: "Брифінг місії + ШІ-синтез", state: "available", note: "/briefing/mission(/synthesis)" },
+  { key: "Цикл навчання (мета-KPI)", state: "available", note: "/learning/loop-kpi" },
+  { key: "Геокарта подій", state: "available", note: "MapPage / GET /events/geojson" },
+  { key: "Telegram-сповіщення", state: "available", note: "ConnectorKind.telegram (Bot API)" },
+  { key: "CRUD довідників (admin)", state: "available", note: "POST/PATCH/DELETE /dictionaries" },
   { key: "ISO/IEC 27001:2022 controls", state: "partial", note: "docs/normative/iso-27001-controls.md" },
-  { key: "Dictionary versioning", state: "planned", note: "Roadmap Stage 12" },
-  { key: "Geospatial map UI", state: "planned", note: "next minor" },
-  { key: "Telegram/Signal reminders", state: "planned", note: "Stage 13" },
+  { key: "Signal-канал сповіщень", state: "planned", note: "за потреби; Telegram уже є" },
+  { key: "Шифрування at-rest / PITR backup", state: "planned", note: "платний план Postgres" },
 ];
 
 function stateChip(s: string): string {

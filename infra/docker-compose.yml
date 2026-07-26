@@ -25,6 +25,12 @@ services:
       AAR_DATABASE_URL: postgresql+asyncpg://aar:aar@db:5432/aar
       AAR_REDIS_URL: redis://redis:6379/0
       AAR_JWT_SECRET: change-me
+      # Local preview: migrate + seed demo data (creates the bootstrap admin
+      # admin@aar.local / aar-admin-2026 and ~3000 synthetic events) so the
+      # stack is usable immediately. Set to "false" for an empty DB.
+      AAR_SEED_ON_START: "true"
+      AAR_ADMIN_EMAIL: admin@aar.local
+      AAR_ADMIN_PASSWORD: aar-admin-2026
     depends_on:
       db:
         condition: service_healthy
@@ -32,8 +38,8 @@ services:
         condition: service_started
     ports:
       - "8000:8000"
-    command: >
-      sh -c "alembic upgrade head && uvicorn aar_api.main:app --host 0.0.0.0 --port 8000"
+    # No command override: the image entrypoint (start.sh) runs migrations,
+    # optional seed, then uvicorn on $PORT (8000).
 
   web:
     build: ../apps/web
