@@ -18,8 +18,8 @@ interface Delivery {
   subscription_id: number;
   event_kind: string;
   status: string;
-  status_code: number | null;
-  attempt: number;
+  response_code: number | null;
+  attempts: number;
   error: string | null;
   dispatched_at: string;
 }
@@ -31,12 +31,31 @@ interface ConnectorsInfo {
   notes: Record<string, string>;
 }
 
+/**
+ * DeliveryStatus (apps/api/aar_api/models/integration.py) is
+ * pending / delivered / failed — there is no "success". Comparing against
+ * "success" painted every delivery, including successful ones, with the error
+ * chip, which made the integrations log read as if nothing ever worked.
+ */
+function deliveryChip(status: string): string {
+  switch (status) {
+    case "delivered":
+      return "chip chip-active";
+    case "failed":
+      return "chip chip-error";
+    case "pending":
+      return "chip chip-draft";
+    default:
+      return "chip";
+  }
+}
+
 const EMPTY_FORM = {
   name: "",
   kind: "generic",
   target_url: "",
   secret: "",
-  events: ["usage_event_created"] as string[],
+  events: ["usage_event.created"] as string[],
   active: true,
 };
 
@@ -268,12 +287,10 @@ export default function IntegrationsPage() {
                   <td className="mono">{d.subscription_id}</td>
                   <td>{d.event_kind}</td>
                   <td>
-                    <span className={d.status === "success" ? "chip chip-active" : "chip chip-error"}>
-                      {d.status}
-                    </span>
+                    <span className={deliveryChip(d.status)}>{d.status}</span>
                   </td>
-                  <td className="mono">{d.status_code ?? "—"}</td>
-                  <td>{d.attempt}</td>
+                  <td className="mono">{d.response_code ?? "—"}</td>
+                  <td>{d.attempts}</td>
                   <td>{new Date(d.dispatched_at).toLocaleString("uk")}</td>
                 </tr>
               ))}

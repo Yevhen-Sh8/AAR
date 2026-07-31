@@ -1,7 +1,24 @@
 {
-  "kinds": ["generic", "odin", "delta", "kropyva", "sap", "telegram"],
-  "events": ["usage_event_created", "case_opened", "case_closed", "recommendation_created"],
-  "excluded": ["oberig"],
+  "kinds": [
+    "generic",
+    "odin",
+    "delta",
+    "kropyva",
+    "sap",
+    "telegram"
+  ],
+  "events": [
+    "aar_case.closed",
+    "aar_case.created",
+    "aar_case.transitioned",
+    "individual_report.requested",
+    "recommendation.auto_validated",
+    "signal.created",
+    "usage_event.created"
+  ],
+  "excluded": [
+    "oberig"
+  ],
   "notes": {
     "delta": "Огортає подію у GeoJSON FeatureCollection",
     "kropyva": "Один GeoJSON Feature — для прямого імпорту на мапу",
