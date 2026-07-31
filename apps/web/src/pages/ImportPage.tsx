@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { API_BASE } from "../lib/api";
+import { getToken } from "../lib/auth";
 import { Upload, FileCheck, AlertCircle, FileText } from "lucide-react";
 
 interface ImportRowError {
@@ -30,8 +32,13 @@ export default function ImportPage() {
     const form = new FormData();
     form.append("file", file);
     try {
-      const resp = await fetch(`/api/events/import?dry_run=${dryRun}`, {
+      // API_BASE, not a literal "/api": in production the frontend is a
+      // static site on a different origin. FormData sets its own
+      // Content-Type boundary, so only Authorization is added here.
+      const token = getToken();
+      const resp = await fetch(`${API_BASE}/events/import?dry_run=${dryRun}`, {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: form,
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);

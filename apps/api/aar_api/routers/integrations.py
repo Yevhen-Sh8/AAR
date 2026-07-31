@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.db import get_session
+from aar_api.models.audit import AuditAction
 from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairReason
 from aar_api.models.event import Item, Outcome, UsageEvent
 from aar_api.models.integration import (
@@ -30,6 +31,7 @@ from aar_api.schemas.integrations import (
     SubscriptionIn,
     SubscriptionOut,
 )
+from aar_api.services.audit import append as audit_append
 from aar_api.services.integrations import (
     canonical_usage_event,
     dispatch,
@@ -55,6 +57,23 @@ async def create_subscription(
         active=payload.active,
     )
     session.add(sub)
+    await session.flush()
+    # AuditAction.SUBSCRIPTION_CREATED existed but was never written: creating
+    # an outbound webhook decides where operational data leaves the system, so
+    # it belongs on the chain. The secret is deliberately NOT in the payload.
+    await audit_append(
+        session,
+        action=AuditAction.SUBSCRIPTION_CREATED,
+        entity_type="subscription",
+        entity_id=sub.id,
+        payload={
+            "name": sub.name,
+            "kind": sub.kind.value,
+            "target_url": sub.target_url,
+            "events": list(sub.events),
+            "active": sub.active,
+        },
+    )
     await session.commit()
     await session.refresh(sub)
     return sub
@@ -75,6 +94,15 @@ async def delete_subscription(
     sub = await session.get(Subscription, sub_id)
     if sub is None:
         raise HTTPException(404, "subscription not found")
+    # Recorded BEFORE the delete: once the row is gone the chain is the only
+    # remaining evidence that this outbound channel ever existed.
+    await audit_append(
+        session,
+        action=AuditAction.SUBSCRIPTION_DELETED,
+        entity_type="subscription",
+        entity_id=sub.id,
+        payload={"name": sub.name, "kind": sub.kind.value, "target_url": sub.target_url},
+    )
     await session.delete(sub)
     await session.commit()
 

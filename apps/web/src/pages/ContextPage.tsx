@@ -16,7 +16,9 @@ interface ContextAsset {
   owner_role: string | null;
   created_at: string;
   validated_at: string | null;
-  superseded_by: number | null;
+  // NB: the RESPONSE field is superseded_by_id (ContextAssetOut);
+  // the deprecate REQUEST body uses superseded_by. Don't unify them.
+  superseded_by_id: number | null;
 }
 
 // Values MUST match ContextAssetType in apps/api/aar_api/models/context.py —
@@ -188,10 +190,10 @@ export default function ContextPage() {
                           : "—"}
                       </td>
                     </tr>
-                    {selected.superseded_by && (
+                    {selected.superseded_by_id && (
                       <tr>
                         <td>Замінений на</td>
-                        <td className="mono">#{selected.superseded_by}</td>
+                        <td className="mono">#{selected.superseded_by_id}</td>
                       </tr>
                     )}
                   </tbody>

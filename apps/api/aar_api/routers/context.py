@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.db import get_session
 from aar_api.core.rbac import require_role
+from aar_api.models.audit import AuditAction
 from aar_api.models.context import AssetStatus, ContextAsset, ContextAssetType
 from aar_api.models.user import Role
 from aar_api.schemas.context import (
@@ -12,6 +13,7 @@ from aar_api.schemas.context import (
     DeprecateRequest,
     RejectRequest,
 )
+from aar_api.services.audit import append as audit_append
 from aar_api.services.context_assets import (
     deprecate_asset,
     reject_asset,
@@ -71,6 +73,17 @@ async def create_asset(
         status=AssetStatus.DRAFT,
     )
     session.add(asset)
+    await session.flush()
+    # persist_drafts() (the LLM path) already writes CONTEXT_ASSET_CREATED;
+    # manual creation went unrecorded, so the chain's coverage of asset
+    # provenance depended on which path produced it.
+    await audit_append(
+        session,
+        action=AuditAction.CONTEXT_ASSET_CREATED,
+        entity_type="context_asset",
+        entity_id=asset.id,
+        payload={"type": asset.type.value, "title": asset.title, "source": asset.source},
+    )
     await session.commit()
     await session.refresh(asset)
     return asset

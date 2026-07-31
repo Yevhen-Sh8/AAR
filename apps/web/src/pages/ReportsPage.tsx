@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileBarChart, Download, Calendar } from "lucide-react";
-import { apiFetch, IS_DEMO } from "../lib/api";
+import { API_BASE, apiFetch, IS_DEMO } from "../lib/api";
 
 interface DailyRow {
   operator_code: string;
@@ -48,7 +48,10 @@ function currentMonth(): { y: number; m: number } {
 }
 
 function downloadUrl(path: string): string {
-  const base = IS_DEMO ? import.meta.env.BASE_URL + "mock" : "/api";
+  // Must follow the SAME resolution as apiFetch: in production the frontend
+  // is a static site on a different origin than the API (VITE_API_BASE is an
+  // absolute URL), so a literal "/api" would hit the CDN and 404.
+  const base = IS_DEMO ? import.meta.env.BASE_URL + "mock" : API_BASE;
   return `${base}${path}`;
 }
 
