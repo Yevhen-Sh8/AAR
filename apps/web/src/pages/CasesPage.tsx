@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { FolderKanban, ArrowRight, Sparkles, Save, UserPlus, EyeOff } from "lucide-react";
 import { apiFetch, IS_DEMO } from "../lib/api";
+import ParticipantPicker from "../components/ParticipantPicker";
+import { functionLabel, type ParticipantFunction } from "../lib/people";
 
 interface AARCase {
   id: number;
@@ -30,6 +32,13 @@ interface CaseReport {
   why: string | null;
   requested_at: string | null;
   submitted_at: string | null;
+  // Wave 11 snapshots. `function` is what the loss-zone model actually needs
+  // (it survives anonymisation, which nulls user_id); `off_roster` records
+  // that the person was outside the case operator — a normal, useful fact,
+  // never an error. Both are persisted per report, so they must be rendered
+  // here rather than living only in the picker's transient state.
+  function: string | null;
+  off_roster: boolean;
 }
 
 const STAGES = [
@@ -92,7 +101,6 @@ export default function CasesPage() {
   const qc = useQueryClient();
   const [selected, setSelected] = useState<AARCase | null>(null);
   const [draft, setDraft] = useState<Partial<AARCase>>({});
-  const [requestUserIds, setRequestUserIds] = useState("");
 
   const cases = useQuery({
     queryKey: ["cases-all"],
@@ -142,18 +150,6 @@ export default function CasesPage() {
     queryFn: () =>
       apiFetch<CaseReport[]>(`/aar/cases/${selected!.id}/reports`),
     enabled: !!selected,
-  });
-
-  const requestReports = useMutation({
-    mutationFn: (vars: { id: number; user_ids: number[] }) =>
-      apiFetch<{ requested_count: number; skipped_existing: number }>(
-        `/aar/cases/${vars.id}/request-reports`,
-        { method: "POST", body: JSON.stringify({ user_ids: vars.user_ids }) },
-      ),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["case-reports"] });
-      setRequestUserIds("");
-    },
   });
 
   const rows = cases.data ?? [];
@@ -325,28 +321,20 @@ export default function CasesPage() {
               </span>
             </div>
 
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <input
-                className="form-input"
-                placeholder="user_ids через кому, напр. 1,2,3"
-                value={requestUserIds}
-                onChange={(e) => setRequestUserIds(e.target.value)}
-                style={{ flex: 1 }}
+            <div
+              style={{
+                border: "1px solid var(--border-muted)",
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 16,
+              }}
+            >
+              <ParticipantPicker
+                key={current.id}
+                caseId={current.id}
+                caseOperatorId={current.operator_id}
+                onRequested={() => reports.refetch()}
               />
-              <button
-                onClick={() => {
-                  const ids = requestUserIds
-                    .split(",")
-                    .map((s) => parseInt(s.trim(), 10))
-                    .filter((n) => !isNaN(n));
-                  if (ids.length > 0) {
-                    requestReports.mutate({ id: current.id, user_ids: ids });
-                  }
-                }}
-                disabled={requestReports.isPending || IS_DEMO || !requestUserIds.trim()}
-              >
-                Розіслати запити
-              </button>
             </div>
 
             {(reports.data ?? []).length === 0 ? (
@@ -357,6 +345,7 @@ export default function CasesPage() {
                   <tr>
                     <th>#</th>
                     <th>Від</th>
+                    <th>Функція</th>
                     <th>Що сталось</th>
                     <th>Чому</th>
                     <th>Стан</th>
@@ -378,7 +367,17 @@ export default function CasesPage() {
                             (запит #{r.requested_for_user_id})
                           </span>
                         )}
+                        {r.off_roster && (
+                          <span
+                            className="chip chip-mid"
+                            style={{ marginLeft: 6 }}
+                            title="Свідчення поза складом експлуатанта — це нормально й підвищує якість атрибуції"
+                          >
+                            поза складом
+                          </span>
+                        )}
                       </td>
+                      <td>{functionLabel(r.function as ParticipantFunction | null)}</td>
                       <td style={{ maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {r.what_happened ?? "—"}
                       </td>

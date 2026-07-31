@@ -32,6 +32,8 @@ const MOCK_ROUTES: Record<string, string> = {
   "/aar/cases": "/cases.json",
   "/events/geojson": "/events-geojson.json",
   "/events": "/events.json",
+  // More specific prefixes first — matching is startsWith.
+  "/people": "/people.json",
   "/dictionaries/operators": "/operators.json",
   "/dictionaries/loss-reasons": "/loss-reasons.json",
   "/dictionaries/repair-reasons": "/repair-reasons.json",
