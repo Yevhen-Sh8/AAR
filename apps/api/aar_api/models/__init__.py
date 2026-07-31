@@ -1,4 +1,7 @@
 from aar_api.models.aar import (
+    EXPECTED_FUNCTIONS,
+    FUNCTION_LABELS_UK,
+    FUNCTION_ZONE_AFFINITY,
     AARCase,
     CaseStatus,
     IndividualReport,
@@ -23,9 +26,12 @@ from aar_api.models.integration import (
     WebhookEventKind,
 )
 from aar_api.models.signal import PreTaskSignal, SignalKind, SignalStatus
-from aar_api.models.user import Role, User
+from aar_api.models.user import ParticipantFunction, Role, User
 
 __all__ = [
+    "EXPECTED_FUNCTIONS",
+    "FUNCTION_LABELS_UK",
+    "FUNCTION_ZONE_AFFINITY",
     "AARCase",
     "AssetStatus",
     "AssetUsage",
@@ -43,6 +49,7 @@ __all__ = [
     "LossReason",
     "Operator",
     "Outcome",
+    "ParticipantFunction",
     "PreTaskSignal",
     "Recommendation",
     "RecommendationStatus",

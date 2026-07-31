@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from aar_api.models.aar import CaseStatus, RecommendationStatus, TriggerType
+from aar_api.models.user import ParticipantFunction
 
 
 class _Base(BaseModel):
@@ -62,6 +63,7 @@ class AARCaseOut(_Base):
 class IndividualReportIn(BaseModel):
     user_id: int | None = None
     anonymous: bool = False
+    function: ParticipantFunction | None = None
     what_happened: str | None = None
     what_worked: str | None = None
     what_failed: str | None = None
@@ -77,6 +79,9 @@ class IndividualReportOut(_Base):
     user_id: int | None
     requested_for_user_id: int | None
     anonymous: bool
+    function: ParticipantFunction | None = None
+    operator_id: int | None = None
+    off_roster: bool = False
     what_happened: str | None
     what_worked: str | None
     what_failed: str | None
@@ -87,16 +92,82 @@ class IndividualReportOut(_Base):
     submitted_at: datetime | None
 
 
-class ReportRequestIn(BaseModel):
-    """Manager-side: ask N participants to submit individual reports."""
+class ParticipantRequestIn(BaseModel):
+    """One picked participant, with an optional per-case function override.
 
-    user_ids: list[int]
+    `function` overrides the person's default `users.function` for THIS case
+    only; omitting it falls back to the default, and None is a legal outcome
+    (rendered as «не вказано», counted in the `"unknown"` coverage bucket).
+    """
+
+    user_id: int
+    function: ParticipantFunction | None = None
+
+
+class ReportRequestIn(BaseModel):
+    """Manager-side: ask N participants to submit individual reports.
+
+    `user_ids` is DEPRECATED — kept because the pre-Wave-11 frontend and
+    tests still send it. It is normalised into `participants` (with
+    `function=None`) by the validator below, so the handler only ever deals
+    with one shape.
+    """
+
+    participants: list[ParticipantRequestIn] | None = None
+    user_ids: list[int] | None = None  # DEPRECATED — use `participants`
+
+    @model_validator(mode="after")
+    def _normalise(self) -> "ReportRequestIn":
+        entries = list(self.participants or [])
+        entries += [ParticipantRequestIn(user_id=uid) for uid in (self.user_ids or [])]
+        if not entries:
+            raise ValueError("потрібно вказати щонайменше одного учасника")
+        # Dedupe on user_id, preserving order and the FIRST function given.
+        seen: set[int] = set()
+        deduped: list[ParticipantRequestIn] = []
+        for e in entries:
+            if e.user_id in seen:
+                continue
+            seen.add(e.user_id)
+            deduped.append(e)
+        self.participants = deduped
+        return self
+
+    @property
+    def entries(self) -> list[ParticipantRequestIn]:
+        """Normalised participant list — always populated post-validation."""
+        return self.participants or []
 
 
 class ReportRequestSummary(BaseModel):
     requested_count: int
     skipped_existing: int
     pending_report_ids: list[int]
+    # Wave 11 — advisory only. Nothing here ever blocks anything.
+    function_coverage: dict[str, int] = {}
+    missing_functions: list[str] = []
+    off_roster_user_ids: list[int] = []
+    warnings: list[str] = []
+
+
+class ReportCoverageOut(BaseModel):
+    """Advisory read-only view: whose voice is present in this case.
+
+    Never gates a case transition — that would collide with the ADR-010 state
+    machine. It exists to make «інакше екіпаж винен за замовчуванням» visible.
+    """
+
+    case_id: int
+    submitted: int
+    pending: int
+    functions: dict[str, int]
+    zones_covered: list[str]
+    zones_missing: list[str]
+    off_roster_count: int
+    single_function_only: bool
+    # Number of participants in the case: with 2 participants, "anonymous" is
+    # theatre. Surfaced rather than pretended away.
+    anonymity_floor: int
 
 
 class RecommendationIn(BaseModel):

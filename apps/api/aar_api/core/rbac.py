@@ -47,3 +47,32 @@ def require_role(*allowed: Role):
         return claims
 
     return _dep
+
+
+async def optional_claims(
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> dict | None:
+    """Decode the bearer token if there is a valid one; otherwise return None.
+
+    DELIBERATE ASYMMETRY with `require_role`: this helper has NO dev-bypass.
+    `require_role` short-circuits to ADMIN whenever the environment is
+    "development" — which is also the test environment — so reusing it to
+    decide *privacy* questions would both reveal identities in dev and make
+    the redaction path untestable. A privacy control must fail closed: no
+    token, an expired token or a malformed token all yield None, and every
+    caller treats None as "not privileged". Do not "unify" this with
+    require_role; doing so re-opens the anonymity leak.
+    """
+    if creds is None:
+        return None
+    try:
+        return decode_token(creds.credentials)
+    except JWTError:
+        return None
+
+
+def has_role(claims: dict | None, *allowed: Role) -> bool:
+    """True when the (already decoded) claims carry one of `allowed`."""
+    if not claims:
+        return False
+    return claims.get("role") in {r.value for r in allowed}

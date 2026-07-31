@@ -5,6 +5,8 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Tex
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aar_api.core.db import Base
+from aar_api.models.dictionaries import Zone
+from aar_api.models.user import ParticipantFunction
 
 
 class CaseStatus(StrEnum):
@@ -102,12 +104,28 @@ class IndividualReport(Base):
 
     Pending-request: a manager asks N users for a report → N stub rows are
     created with `requested_at` set, `user_id`/`submitted_at` null. The user
-    later fills them in.
+    later fills them in. This row *is* the per-case membership record — there
+    is deliberately no separate `case_participants` table (ADR-023).
 
-    Anonymous submission (TC 25-20 culture): when `anonymous=True`, the
-    response API redacts `user_id` to viewers without admin role, but the
-    audit chain still records the originator. This preserves blame-free
-    capture without losing the audit trail.
+    Anonymous submission (TC 25-20 culture): when `anonymous=True`, `user_id`
+    is nulled on the row AND the serialization layer
+    (`services/redaction.report_out`) additionally hides
+    `requested_for_user_id` and `operator_id` — and `function` too when the
+    person is the sole holder of that function in the case — from every viewer
+    without the admin role. The DB keeps `requested_for_user_id` because the
+    request-idempotency skip-set keys on it; redaction happens at the response
+    boundary, never by destroying data.
+
+    The audit chain records the originator of an anonymous submission via
+    `AuditAction.INDIVIDUAL_REPORT_SUBMITTED` (payload
+    `originator_user_id`), and `GET /audit/log` redacts that field for
+    non-admins in exactly the same way.
+
+    Wave 11 snapshots (`function`, `operator_id`, `off_roster`) are frozen
+    copies, not joins: anonymisation nulls `user_id` (so a join would lose the
+    function the loss-zone WHY needs), a person's function changes over time
+    while an evidentiary record must not mutate retroactively, and coverage
+    becomes a single-table GROUP BY.
     """
 
     __tablename__ = "individual_reports"
@@ -118,6 +136,20 @@ class IndividualReport(Base):
         ForeignKey("users.id"), nullable=True
     )
     anonymous: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+
+    # ---- Wave 11 snapshots (evidentiary — never rewritten) ----------------
+    function: Mapped[ParticipantFunction | None] = mapped_column(
+        Enum(ParticipantFunction, native_enum=False, length=32), nullable=True, index=True
+    )
+    # RESTRICT (no ondelete) on purpose — this snapshot is evidence.
+    operator_id: Mapped[int | None] = mapped_column(
+        ForeignKey("operators.id"), nullable=True
+    )
+    # Recorded, not blocked: the person was picked for a case owned by another
+    # operator. That is analytic signal, not an error.
+    off_roster: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     what_happened: Mapped[str | None] = mapped_column(Text, nullable=True)
     what_worked: Mapped[str | None] = mapped_column(Text, nullable=True)
     what_failed: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -130,6 +162,41 @@ class IndividualReport(Base):
     submitted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+# --------------------------------------------------------------------------
+# Derived, NOT stored (ADR-013 compute-on-the-fly).
+# --------------------------------------------------------------------------
+# Which loss zone a given field function is positioned to speak to. Used by
+# GET /aar/report-coverage to answer «яких зон ми не почули» — the direct
+# product answer to «інакше екіпаж винен за замовчуванням».
+FUNCTION_ZONE_AFFINITY: dict[ParticipantFunction, Zone] = {
+    ParticipantFunction.CREW: Zone.OPERATOR,
+    ParticipantFunction.ENGINEERING: Zone.OPERATOR,
+    ParticipantFunction.COMMANDER: Zone.OPERATOR,
+    ParticipantFunction.EW_RECON: Zone.EXTERNAL,
+    ParticipantFunction.MANUFACTURER: Zone.MANUFACTURER,
+    ParticipantFunction.OTHER: Zone.UNKNOWN,
+}
+
+# The baseline we expect a well-covered case to hear from. `manufacturer` is
+# excluded — a vendor rep is usually unreachable — but it is still counted
+# whenever a report from one is present.
+EXPECTED_FUNCTIONS: tuple[ParticipantFunction, ...] = (
+    ParticipantFunction.CREW,
+    ParticipantFunction.ENGINEERING,
+    ParticipantFunction.COMMANDER,
+    ParticipantFunction.EW_RECON,
+)
+
+FUNCTION_LABELS_UK: dict[ParticipantFunction, str] = {
+    ParticipantFunction.CREW: "екіпаж / оператор",
+    ParticipantFunction.ENGINEERING: "інженерно-технічна обслуга",
+    ParticipantFunction.COMMANDER: "начальник розрахунку / командир групи",
+    ParticipantFunction.EW_RECON: "РЕБ / розвідка",
+    ParticipantFunction.MANUFACTURER: "представник виробника",
+    ParticipantFunction.OTHER: "інше",
+}
 
 
 class Recommendation(Base):

@@ -17,6 +17,7 @@ import {
   Megaphone,
   ClipboardList,
   Map as MapIcon,
+  Users,
 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { installAutoSync } from "./lib/sync";
@@ -43,6 +44,7 @@ const LearningLoopPage = lazy(() => import("./pages/LearningLoopPage"));
 const SignalsPage = lazy(() => import("./pages/SignalsPage"));
 const BriefingPage = lazy(() => import("./pages/BriefingPage"));
 const MapPage = lazy(() => import("./pages/MapPage"));
+const PeoplePage = lazy(() => import("./pages/PeoplePage"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -64,6 +66,7 @@ const NAV = [
   { to: "/reports", icon: FileBarChart, label: "Звіти" },
   { to: "/learning-loop", icon: Activity, label: "Цикл навчання" },
   { section: "Система" },
+  { to: "/people", icon: Users, label: "Люди" },
   { to: "/dictionaries", icon: BookOpen, label: "Довідники" },
   { to: "/integrations", icon: Plug, label: "Інтеграції" },
   { to: "/audit", icon: Shield, label: "Аудит" },
@@ -154,6 +157,7 @@ export default function App() {
               <Route path="/context" element={<ContextPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/learning-loop" element={<LearningLoopPage />} />
+              <Route path="/people" element={<PeoplePage />} />
               <Route path="/dictionaries" element={<DictionariesPage />} />
               <Route path="/integrations" element={<IntegrationsPage />} />
               <Route path="/audit" element={<AuditPage />} />

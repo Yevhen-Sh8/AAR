@@ -1,0 +1,110 @@
+[
+  {
+    "id": 11,
+    "full_name": "Ковальчук Андрій Петрович",
+    "callsign": "Граніт",
+    "email": "kovalchuk@example.org",
+    "role": "participant",
+    "operator_id": 7,
+    "function": "crew",
+    "is_active": true,
+    "can_login": true,
+    "created_at": "2026-01-14T09:12:00Z"
+  },
+  {
+    "id": 12,
+    "full_name": "Мельник Олег Ігорович",
+    "callsign": "Пума",
+    "email": null,
+    "role": "participant",
+    "operator_id": 7,
+    "function": "crew",
+    "is_active": true,
+    "can_login": false,
+    "created_at": "2026-01-14T09:15:00Z"
+  },
+  {
+    "id": 13,
+    "full_name": "Бондаренко Сергій Вікторович",
+    "callsign": "Дизель",
+    "email": "bondarenko@example.org",
+    "role": "analyst",
+    "operator_id": 7,
+    "function": "engineering",
+    "is_active": true,
+    "can_login": true,
+    "created_at": "2026-01-20T11:02:00Z"
+  },
+  {
+    "id": 14,
+    "full_name": "Ткаченко Ігор Миколайович",
+    "callsign": "Беркут",
+    "email": "tkachenko@example.org",
+    "role": "manager",
+    "operator_id": 7,
+    "function": "commander",
+    "is_active": true,
+    "can_login": true,
+    "created_at": "2026-02-03T08:44:00Z"
+  },
+  {
+    "id": 15,
+    "full_name": "Савчук Дмитро Олександрович",
+    "callsign": "Ехо",
+    "email": null,
+    "role": "participant",
+    "operator_id": 7,
+    "function": null,
+    "is_active": true,
+    "can_login": false,
+    "created_at": "2026-02-11T13:31:00Z"
+  },
+  {
+    "id": 21,
+    "full_name": "Гриценко Вадим Юрійович",
+    "callsign": "Спектр",
+    "email": "hrytsenko@example.org",
+    "role": "participant",
+    "operator_id": 3,
+    "function": "ew_recon",
+    "is_active": true,
+    "can_login": true,
+    "created_at": "2026-01-09T10:05:00Z"
+  },
+  {
+    "id": 22,
+    "full_name": "Литвин Марія Степанівна",
+    "callsign": null,
+    "email": "lytvyn@example.org",
+    "role": "participant",
+    "operator_id": 5,
+    "function": "engineering",
+    "is_active": true,
+    "can_login": false,
+    "created_at": "2026-03-02T15:20:00Z"
+  },
+  {
+    "id": 23,
+    "full_name": "Романюк Павло Богданович",
+    "callsign": "Завод",
+    "email": "romaniuk@vendor.example.org",
+    "role": "participant",
+    "operator_id": null,
+    "function": "manufacturer",
+    "is_active": true,
+    "can_login": false,
+    "created_at": "2026-03-18T07:50:00Z"
+  },
+  {
+    "id": 24,
+    "full_name": "Захарченко Юрій Тарасович",
+    "callsign": "Кедр",
+    "email": null,
+    "role": "participant",
+    "operator_id": 2,
+    "function": "other",
+    "is_active": true,
+    "can_login": false,
+    "created_at": "2025-12-01T12:00:00Z"
+  }
+]
