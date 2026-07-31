@@ -60,7 +60,17 @@ async def get_asset(
 async def create_asset(
     payload: ContextAssetIn, session: AsyncSession = Depends(get_session)
 ) -> ContextAsset:
-    """Manual creation — also starts as DRAFT (ADR-008)."""
+    """Manual creation — also starts as DRAFT (ADR-008).
+
+    DELIBERATELY has no `require_role`, unlike validate/reject/deprecate below.
+    The asymmetry is the point: a low barrier to *propose* and a high barrier to
+    *validate*. A created asset is inert — it starts DRAFT, is never
+    auto-validated (ADR-008), and only `validated` assets feed the brief or
+    analogy search (ADR-009), so an unprivileged author cannot influence
+    anything until a manager/analyst signs it off. Same shape as submitting a
+    pre-task signal (ADR-021). Note the production auth-gate still requires a
+    valid token here — "open" means any authenticated role, not anonymous.
+    """
     asset = ContextAsset(
         type=payload.type,
         title=payload.title,

@@ -194,7 +194,14 @@ async def close_case(case_id: int, session: AsyncSession = Depends(get_session))
     proper NATO-cycle tracking."""
     case = await _get_case(session, case_id)
     case.status = CaseStatus.CLOSED
-    case.closed_at = datetime.now(UTC)
+    now = datetime.now(UTC)
+    case.closed_at = now
+    # Mirror /transition: without this stamp a case closed via the legacy
+    # shortcut has validated_at NULL forever, and learning_metrics silently
+    # drops it from time-to-validation — the shortcut quietly shrank the
+    # very KPI that measures whether the loop works.
+    if case.validated_at is None:
+        case.validated_at = now
     await audit_append(
         session,
         action=AuditAction.CASE_CLOSED,

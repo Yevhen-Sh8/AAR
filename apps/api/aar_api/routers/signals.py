@@ -170,6 +170,22 @@ async def convert_signal_to_case(
     signal.status = SignalStatus.CONVERTED
     signal.case_id = case.id
     signal.reviewed_at = datetime.now(UTC)
+    # Two entries on purpose: SIGNAL_CONVERTED records what happened to the
+    # signal, CASE_CREATED records that a case was opened. Keeping the latter
+    # unconditional makes "every case-open is on the chain as CASE_CREATED" a
+    # single verifiable invariant, instead of "CASE_CREATED or SIGNAL_CONVERTED
+    # or a trigger entry, depending on provenance".
+    await audit_append(
+        session,
+        action=AuditAction.CASE_CREATED,
+        entity_type="aar_case",
+        entity_id=case.id,
+        payload={
+            "title": case.title,
+            "trigger": case.trigger.value,
+            "from_signal_id": signal.id,
+        },
+    )
     await audit_append(
         session,
         action=AuditAction.SIGNAL_CONVERTED,
