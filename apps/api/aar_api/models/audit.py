@@ -40,6 +40,14 @@ class AuditAction(StrEnum):
     DICTIONARY_CREATED = "dictionary.created"
     DICTIONARY_UPDATED = "dictionary.updated"
     DICTIONARY_DELETED = "dictionary.deleted"
+    # Wave 11 — participant lifecycle. No migration needed: the `action`
+    # column is Enum(..., native_enum=False, length=64), i.e. a plain VARCHAR.
+    INDIVIDUAL_REPORT_REQUESTED = "individual_report.requested"
+    INDIVIDUAL_REPORT_SUBMITTED = "individual_report.submitted"
+    PERSON_CREATED = "person.created"
+    PERSON_UPDATED = "person.updated"
+    PERSON_DELETED = "person.deleted"
+    PERSON_PASSWORD_SET = "person.password_set"
 
 
 class AuditLog(Base):

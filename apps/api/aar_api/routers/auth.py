@@ -55,14 +55,23 @@ async def login(
     user = await session.scalar(
         select(User).where(User.email == payload.email.strip().lower())
     )
-    if user is None or not verify_password(payload.password, user.hashed_password):
-        # Same message for both cases — don't leak which emails exist.
+    # Wave 11: a roster-only person has no password (and possibly no email) and
+    # may be deactivated — `can_login` folds all three checks. Verifying the
+    # password is still attempted only for credentialed accounts, and every
+    # failure mode returns the SAME 401 so we never leak which emails exist,
+    # which are roster-only, or which are deactivated.
+    if (
+        user is None
+        or not user.can_login
+        or not verify_password(payload.password, user.hashed_password or "")
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="невірний email або пароль",
         )
+    # can_login guarantees email is not None.
     token = create_access_token(
-        subject=user.email, extra={"role": user.role.value, "uid": user.id}
+        subject=user.email or "", extra={"role": user.role.value, "uid": user.id}
     )
     return TokenResponse(
         access_token=token, expires_minutes=get_settings().jwt_expires_minutes
