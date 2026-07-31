@@ -19,13 +19,18 @@ interface ContextAsset {
   superseded_by: number | null;
 }
 
-const TYPE_FILTERS = [
+// Values MUST match ContextAssetType in apps/api/aar_api/models/context.py —
+// the router types the query param as the enum, so anything else is a 422.
+export const TYPE_FILTERS = [
   { value: "", label: "Усі типи" },
-  { value: "fact", label: "fact" },
-  { value: "pattern", label: "pattern" },
-  { value: "recommendation", label: "recommendation" },
-  { value: "classifier", label: "classifier" },
-  { value: "narrative", label: "narrative" },
+  { value: "business_rule", label: "Правило (business_rule)" },
+  { value: "failure_pattern", label: "Патерн відмови (failure_pattern)" },
+  { value: "edge_case", label: "Крайній випадок (edge_case)" },
+  { value: "acceptance_criterion", label: "Критерій приймання (acceptance_criterion)" },
+  { value: "architectural_decision", label: "Архітектурне рішення (architectural_decision)" },
+  { value: "deployment_lesson", label: "Урок розгортання (deployment_lesson)" },
+  { value: "operator_practice", label: "Практика експлуатанта (operator_practice)" },
+  { value: "training_gap", label: "Прогалина в підготовці (training_gap)" },
 ];
 
 const STATUS_FILTERS = [
@@ -118,7 +123,16 @@ export default function ContextPage() {
         <div className="context-split">
           <div className="context-list">
             {assets.isLoading && <div className="loading">Завантаження…</div>}
-            {rows.length === 0 && !assets.isLoading && (
+            {/* Without this branch a failed request rendered as "нічого не
+                знайдено", which is what hid the invalid-filter 422 for so
+                long: a broken query and an empty result looked identical. */}
+            {assets.isError && (
+              <div className="error-msg">
+                Помилка завантаження активів. Спробуйте змінити фільтри або
+                оновити сторінку.
+              </div>
+            )}
+            {rows.length === 0 && !assets.isLoading && !assets.isError && (
               <div className="loading">Жодного активу за фільтрами</div>
             )}
             {rows.map((a) => (
