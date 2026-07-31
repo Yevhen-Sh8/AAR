@@ -22,14 +22,83 @@ interface ChainStatus {
   message: string;
 }
 
-const ACTION_FILTERS = [
-  { value: "", label: "Усі дії" },
-  { value: "event_created", label: "event_created" },
-  { value: "case_opened", label: "case_opened" },
-  { value: "case_closed", label: "case_closed" },
-  { value: "asset_validated", label: "asset_validated" },
-  { value: "asset_rejected", label: "asset_rejected" },
-  { value: "asset_deprecated", label: "asset_deprecated" },
+// Values MUST match AuditAction in apps/api/aar_api/models/audit.py — the
+// router types the query param as the enum, so anything else is a 422. The
+// members are dotted ("case.created"), never underscored.
+export const ACTION_GROUPS: { group: string; items: { value: string; label: string }[] }[] = [
+  {
+    group: "Події",
+    items: [
+      { value: "event.created", label: "подія створена" },
+      { value: "event.inbound", label: "подія з інтеграції" },
+    ],
+  },
+  {
+    group: "Кейси",
+    items: [
+      { value: "case.created", label: "кейс відкрито" },
+      { value: "case.transitioned", label: "перехід стадії" },
+      { value: "case.analysis_drafted", label: "чернетка аналізу" },
+      { value: "case.closed", label: "кейс закрито" },
+    ],
+  },
+  {
+    group: "Рекомендації",
+    items: [
+      { value: "recommendation.updated", label: "оновлено" },
+      { value: "recommendation.auto_validated", label: "автовалідовано" },
+      { value: "recommendation.regressed", label: "регресія" },
+    ],
+  },
+  {
+    group: "Контекст-активи",
+    items: [
+      { value: "context_asset.created", label: "створено" },
+      { value: "context_asset.validated", label: "валідовано" },
+      { value: "context_asset.rejected", label: "відхилено" },
+      { value: "context_asset.deprecated", label: "деприковано" },
+    ],
+  },
+  {
+    group: "Сигнали",
+    items: [
+      { value: "signal.created", label: "подано" },
+      { value: "signal.reviewed", label: "розглянуто" },
+      { value: "signal.converted", label: "ескальовано в кейс" },
+    ],
+  },
+  {
+    group: "Індивідуальні звіти",
+    items: [
+      { value: "individual_report.requested", label: "запит надіслано" },
+      { value: "individual_report.submitted", label: "звіт подано" },
+    ],
+  },
+  {
+    group: "Люди",
+    items: [
+      { value: "person.created", label: "створено" },
+      { value: "person.updated", label: "оновлено" },
+      { value: "person.deleted", label: "видалено" },
+      { value: "person.password_set", label: "встановлено пароль" },
+    ],
+  },
+  {
+    group: "Довідники",
+    items: [
+      { value: "dictionary.created", label: "створено" },
+      { value: "dictionary.updated", label: "оновлено" },
+      { value: "dictionary.deleted", label: "видалено" },
+    ],
+  },
+  {
+    group: "Система",
+    items: [
+      { value: "subscription.created", label: "підписку створено" },
+      { value: "subscription.deleted", label: "підписку видалено" },
+      { value: "triggers.run", label: "прогін тригерів" },
+    ],
+  },
 ];
 
 function short(hash: string): string {
@@ -64,8 +133,13 @@ export default function AuditPage() {
               value={action}
               onChange={(e) => setAction(e.target.value)}
             >
-              {ACTION_FILTERS.map((f) => (
-                <option key={f.value} value={f.value}>{f.label}</option>
+              <option value="">Усі дії</option>
+              {ACTION_GROUPS.map((g) => (
+                <optgroup key={g.group} label={g.group}>
+                  {g.items.map((f) => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             <button onClick={() => log.refetch()} className="secondary">
