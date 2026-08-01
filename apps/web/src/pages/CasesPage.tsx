@@ -152,6 +152,13 @@ export default function CasesPage() {
     enabled: !!selected,
   });
 
+  // The LLM draft must rest on actual testimony: the server refuses with 409
+  // when nothing has been submitted, so mirror that in the UI instead of
+  // letting the user press a button that cannot succeed.
+  const caseReports = reports.data ?? [];
+  const submittedCount = caseReports.filter((r) => r.submitted_at).length;
+  const pendingCount = caseReports.filter((r) => !r.submitted_at).length;
+
   const rows = cases.data ?? [];
   const grouped = STAGES.map((s) => ({
     stage: s,
@@ -217,8 +224,14 @@ export default function CasesPage() {
               <button
                 className="secondary"
                 onClick={() => draftAnalysis.mutate(current.id)}
-                disabled={draftAnalysis.isPending || IS_DEMO}
-                title="LLM-чернетка аналізу зберігається в кейс"
+                disabled={draftAnalysis.isPending || IS_DEMO || submittedCount === 0}
+                title={
+                  submittedCount === 0
+                    ? `Спершу зберіть свідчення: ${pendingCount} звіт(ів) очікує. ` +
+                      "Аналіз без жодного поданого звіту синтезувався б лише з цифр подій."
+                    : `LLM-чернетка аналізу на основі ${submittedCount} поданих звітів; ` +
+                      "зберігається в кейс"
+                }
               >
                 <Sparkles size={14} /> Згенерувати аналіз (LLM)
               </button>
@@ -316,8 +329,7 @@ export default function CasesPage() {
                 Індивідуальні звіти учасників
               </span>
               <span className="card-badge badge-blue">
-                {(reports.data ?? []).filter((r) => r.submitted_at).length} надано ·{" "}
-                {(reports.data ?? []).filter((r) => !r.submitted_at).length} очікує
+                {submittedCount} надано · {pendingCount} очікує
               </span>
             </div>
 

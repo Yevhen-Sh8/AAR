@@ -17,6 +17,10 @@ class ClassifyResponse(BaseModel):
 
 class DraftAnalysisResponse(BaseModel):
     markdown: str
+    # Evidence provenance: the reader must be able to see how much testimony
+    # the draft actually rests on, not just that a model wrote it.
+    reports_used: int = 0
+    reports_pending: int = 0
 
 
 class AnalogyMatchOut(BaseModel):
