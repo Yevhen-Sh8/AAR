@@ -7,10 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.config import get_settings
 from aar_api.core.db import get_session
+from aar_api.core.rbac import require_role
 from aar_api.models.aar import AARCase, IndividualReport
 from aar_api.models.audit import AuditAction
 from aar_api.models.dictionaries import LossReason, Operator, RepairReason
 from aar_api.models.event import UsageEvent
+from aar_api.models.user import Role
 from aar_api.schemas.llm import (
     AnalogyMatchOut,
     AnalogyResponse,
@@ -29,6 +31,11 @@ from aar_api.services.context_assets import (
 
 router = APIRouter(prefix="/llm", tags=["llm"])
 
+# draft-analysis WRITES case.analysis and appends to the audit chain, so it is a
+# case write, not a read. classify-reason spends money on an external API.
+# Neither may be looser than reading the testimony they are built from.
+_analyst = Depends(require_role(Role.ADMIN, Role.MANAGER, Role.ANALYST))
+
 
 async def _persist_assets_if_any(
     session: AsyncSession,
@@ -45,7 +52,9 @@ async def _persist_assets_if_any(
     await session.commit()
 
 
-@router.post("/classify-reason", response_model=ClassifyResponse)
+@router.post(
+    "/classify-reason", response_model=ClassifyResponse, dependencies=[_analyst]
+)
 async def classify_reason(
     payload: ClassifyRequest,
     session: AsyncSession = Depends(get_session),
@@ -68,7 +77,11 @@ async def classify_reason(
     return ClassifyResponse(**result.task_output.model_dump())
 
 
-@router.post("/cases/{case_id}/draft-analysis", response_model=DraftAnalysisResponse)
+@router.post(
+    "/cases/{case_id}/draft-analysis",
+    response_model=DraftAnalysisResponse,
+    dependencies=[_analyst],
+)
 async def draft_case_analysis(
     case_id: int,
     force: bool = Query(

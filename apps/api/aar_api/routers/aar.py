@@ -53,6 +53,18 @@ router = APIRouter(prefix="/aar", tags=["aar"])
 # Participants must not read each other's testimony.
 _report_reader = Depends(require_role(Role.ADMIN, Role.MANAGER, Role.ANALYST))
 
+# SENSITIVITY ORDERING. Reading a colleague's testimony already requires
+# ANALYST; writing the official conclusion over it, moving the case along the
+# NATO cycle, or closing it must not require LESS. Until now those were open to
+# any authenticated caller, which inverted the ordering and let a participant
+# close a case out from under the auto-validation engine — the one mechanism
+# that proves the loop works.
+_case_writer = Depends(require_role(Role.ADMIN, Role.MANAGER, Role.ANALYST))
+
+# Endorsing, closing and running the trigger engine are command decisions and
+# operational jobs, not analysis.
+_case_owner = Depends(require_role(Role.ADMIN, Role.MANAGER))
+
 
 async def _get_case(session: AsyncSession, case_id: int) -> AARCase:
     case = await session.get(AARCase, case_id)
@@ -61,7 +73,10 @@ async def _get_case(session: AsyncSession, case_id: int) -> AARCase:
     return case
 
 
-@router.post("/cases", response_model=AARCaseOut, status_code=201)
+@router.post(
+    "/cases", response_model=AARCaseOut, status_code=201,
+    dependencies=[_case_writer],
+)
 async def create_case(
     payload: AARCaseIn, session: AsyncSession = Depends(get_session)
 ) -> AARCase:
@@ -115,7 +130,9 @@ async def get_case(case_id: int, session: AsyncSession = Depends(get_session)) -
     return await _get_case(session, case_id)
 
 
-@router.patch("/cases/{case_id}", response_model=AARCaseOut)
+@router.patch(
+    "/cases/{case_id}", response_model=AARCaseOut, dependencies=[_case_writer]
+)
 async def patch_case(
     case_id: int,
     payload: AARCasePatch,
@@ -144,7 +161,10 @@ async def patch_case(
     return case
 
 
-@router.post("/cases/{case_id}/transition", response_model=AARCaseOut)
+@router.post(
+    "/cases/{case_id}/transition", response_model=AARCaseOut,
+    dependencies=[_case_writer],
+)
 async def transition_case(
     case_id: int,
     payload: CaseTransitionIn,
@@ -191,7 +211,10 @@ async def transition_case(
     return case
 
 
-@router.post("/cases/{case_id}/close", response_model=AARCaseOut)
+@router.post(
+    "/cases/{case_id}/close", response_model=AARCaseOut,
+    dependencies=[_case_owner],
+)
 async def close_case(case_id: int, session: AsyncSession = Depends(get_session)) -> AARCase:
     """Legacy shortcut: jump directly to CLOSED. Prefer /transition for
     proper NATO-cycle tracking."""
@@ -572,6 +595,7 @@ async def list_recommendations(
     "/cases/{case_id}/recommendations",
     response_model=RecommendationOut,
     status_code=201,
+    dependencies=[_case_writer],
 )
 async def add_recommendation(
     case_id: int,
@@ -597,6 +621,7 @@ async def add_recommendation(
 @router.patch(
     "/recommendations/{rec_id}",
     response_model=RecommendationOut,
+    dependencies=[_case_writer],
 )
 async def update_recommendation_status(
     rec_id: int,
@@ -624,7 +649,9 @@ async def update_recommendation_status(
     return rec
 
 
-@router.post("/run-triggers", response_model=TriggerResult)
+@router.post(
+    "/run-triggers", response_model=TriggerResult, dependencies=[_case_owner]
+)
 async def run_triggers(
     today: date = Query(default_factory=lambda: datetime.now(UTC).date()),
     session: AsyncSession = Depends(get_session),

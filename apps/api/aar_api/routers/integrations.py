@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.db import get_session
+from aar_api.core.rbac import require_role
 from aar_api.models.audit import AuditAction
 from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairReason
 from aar_api.models.event import Item, Outcome, UsageEvent
@@ -25,6 +26,7 @@ from aar_api.models.integration import (
     Subscription,
     WebhookEventKind,
 )
+from aar_api.models.user import Role
 from aar_api.schemas.integrations import (
     DeliveryOut,
     InboundEvent,
@@ -40,10 +42,20 @@ from aar_api.services.integrations import (
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
+# The `integrator` role existed in the enum and gated NOTHING anywhere in the
+# codebase. These endpoints decide where operational data leaves the system and
+# expose target_url plus the delivery log, so they are exactly what that role is
+# for. Inbound ingest is included deliberately: an external system posting
+# events should authenticate as an integrator, not as "any logged-in user".
+_integrator = Depends(require_role(Role.ADMIN, Role.INTEGRATOR))
+
 
 # -------------------- subscriptions ---------------------------------------
 
-@router.post("/subscriptions", response_model=SubscriptionOut, status_code=201)
+@router.post(
+    "/subscriptions", response_model=SubscriptionOut, status_code=201,
+    dependencies=[_integrator],
+)
 async def create_subscription(
     payload: SubscriptionIn, session: AsyncSession = Depends(get_session)
 ) -> Subscription:
@@ -79,7 +91,10 @@ async def create_subscription(
     return sub
 
 
-@router.get("/subscriptions", response_model=list[SubscriptionOut])
+@router.get(
+    "/subscriptions", response_model=list[SubscriptionOut],
+    dependencies=[_integrator],
+)
 async def list_subscriptions(
     session: AsyncSession = Depends(get_session),
 ) -> list[Subscription]:
@@ -87,7 +102,9 @@ async def list_subscriptions(
     return list(rows)
 
 
-@router.delete("/subscriptions/{sub_id}", status_code=204)
+@router.delete(
+    "/subscriptions/{sub_id}", status_code=204, dependencies=[_integrator]
+)
 async def delete_subscription(
     sub_id: int, session: AsyncSession = Depends(get_session)
 ) -> None:
@@ -107,7 +124,9 @@ async def delete_subscription(
     await session.commit()
 
 
-@router.get("/deliveries", response_model=list[DeliveryOut])
+@router.get(
+    "/deliveries", response_model=list[DeliveryOut], dependencies=[_integrator]
+)
 async def list_deliveries(
     subscription_id: int | None = None,
     limit: int = Query(default=50, le=500),
@@ -143,7 +162,7 @@ async def list_connectors() -> dict[str, Any]:
     }
 
 
-@router.post("/preview")
+@router.post("/preview", dependencies=[_integrator])
 async def preview_payload(
     kind: ConnectorKind,
     event_id: int,
@@ -159,7 +178,10 @@ async def preview_payload(
 
 # -------------------- dispatch (manual) -----------------------------------
 
-@router.post("/dispatch/{event_id}", response_model=list[DeliveryOut])
+@router.post(
+    "/dispatch/{event_id}", response_model=list[DeliveryOut],
+    dependencies=[_integrator],
+)
 async def dispatch_event(
     event_id: int, session: AsyncSession = Depends(get_session)
 ) -> list[Delivery]:
@@ -176,7 +198,7 @@ async def dispatch_event(
 
 # -------------------- inbound (universal) ---------------------------------
 
-@router.post("/inbound/events", response_model=dict)
+@router.post("/inbound/events", response_model=dict, dependencies=[_integrator])
 async def inbound_event(
     payload: InboundEvent, session: AsyncSession = Depends(get_session)
 ) -> dict[str, Any]:
