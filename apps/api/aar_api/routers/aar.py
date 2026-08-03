@@ -545,6 +545,29 @@ async def report_coverage(
     )
 
 
+@router.get("/cases/{case_id}/recommendations", response_model=list[RecommendationOut])
+async def list_recommendations(
+    case_id: int, session: AsyncSession = Depends(get_session)
+) -> list[Recommendation]:
+    """Recommendations of one case.
+
+    There was no list endpoint at all: recommendations could be created and
+    patched but never read back, so the IMPLEMENTED stage of the NATO cycle was
+    unreachable from any client. The only surface exposing them was
+    /aar/my-observations, which is keyed on the CALLER's own testimony — a
+    manager who never submitted a report in a case would see none of them, and
+    the manager is precisely who drives this stage.
+    """
+    await _get_case(session, case_id)
+    return list(
+        await session.scalars(
+            select(Recommendation)
+            .where(Recommendation.case_id == case_id)
+            .order_by(Recommendation.id)
+        )
+    )
+
+
 @router.post(
     "/cases/{case_id}/recommendations",
     response_model=RecommendationOut,

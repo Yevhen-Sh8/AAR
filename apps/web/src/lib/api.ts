@@ -30,6 +30,20 @@ const MOCK_ROUTES: Record<string, string> = {
   // More specific /aar prefixes first — matching is startsWith.
   "/aar/my-report-requests": "/my-report-requests.json",
   "/aar/my-observations": "/my-observations.json",
+  "/aar/report-coverage": "/report-coverage.json",
+  // Per-case report lists: "/aar/cases" (below) would otherwise swallow
+  // "/aar/cases/{id}/reports" and serve the case list as if it were reports.
+  "/aar/cases/27/recommendations": "/case-recommendations.json",
+  "/aar/cases/26/recommendations": "/case-recommendations.json",
+  "/aar/cases/25/recommendations": "/case-recommendations.json",
+  "/aar/cases/24/recommendations": "/case-recommendations.json",
+  "/aar/cases/22/recommendations": "/case-recommendations.json",
+  "/aar/cases/27/reports": "/case-reports.json",
+  "/aar/cases/26/reports": "/case-reports.json",
+  "/aar/cases/25/reports": "/case-reports.json",
+  "/aar/cases/24/reports": "/case-reports.json",
+  "/aar/cases/22/reports": "/case-reports.json",
+  "/aar/cases/18/reports": "/case-reports.json",
   "/reports/monthly": "/monthly.json",
   "/reports/daily": "/daily.json",
   "/aar/cases": "/cases.json",

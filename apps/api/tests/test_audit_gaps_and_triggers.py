@@ -263,3 +263,45 @@ async def test_loop_kpi_respects_the_upper_bound_of_the_window() -> None:
         "case opened after period_to leaked into the window: "
         f"{kpi.cases_with_validation}"
     )
+
+
+# ------------------------------------------- recommendations are readable
+
+async def test_case_recommendations_are_listable() -> None:
+    """There was no GET at all: recommendations could be written and patched
+    but never read back, so the IMPLEMENTED stage was unreachable from any
+    client. The only surface exposing them keyed on the CALLER's own
+    testimony, so a manager who never reported saw none of them.
+    """
+    async with _Session() as s:
+        case = AARCase(title="Кейс із рекомендаціями", trigger=TriggerType.MANUAL)
+        s.add(case)
+        await s.flush()
+        case_id = case.id
+        await s.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        empty = await client.get(f"/aar/cases/{case_id}/recommendations")
+        assert empty.status_code == 200, empty.text
+        assert empty.json() == []
+
+        created = await client.post(
+            f"/aar/cases/{case_id}/recommendations",
+            json={"text": "Ввести передпольотну перевірку каналу"},
+        )
+        assert created.status_code == 201, created.text
+        rec_id = created.json()["id"]
+
+        listed = (await client.get(f"/aar/cases/{case_id}/recommendations")).json()
+        assert [r["id"] for r in listed] == [rec_id]
+        assert listed[0]["status"] == "proposed"
+
+        # A patch must be visible through the list, not only in its own response.
+        await client.patch(
+            f"/aar/recommendations/{rec_id}", json={"status": "in_progress"}
+        )
+        again = (await client.get(f"/aar/cases/{case_id}/recommendations")).json()
+        assert again[0]["status"] == "in_progress"
+
+        assert (await client.get("/aar/cases/999999/recommendations")).status_code == 404

@@ -1,5 +1,38 @@
 [
   {
+    "report_id": 501,
+    "case_id": 26,
+    "case_title": "Повторювана причина loss:c [T2:loss:c:2026-06-01]",
+    "case_status": "analysed",
+    "submitted_at": "2026-06-01T18:30:00Z",
+    "anonymous": false,
+    "outcome_uk": "Кейс проаналізовано, рекомендації в роботі.",
+    "lesson_identified": "Нічні запуски без додаткової підготовки дають кратно більше операторських помилок.",
+    "recommendations": [
+      {
+        "id": 91,
+        "text": "Заборонити третю зміну поспіль для однієї обслуги нічного вікна.",
+        "status": "in_progress",
+        "auto_validated_at": null,
+        "regressed_at": null
+      },
+      {
+        "id": 92,
+        "text": "Внести ручне перемикання резервного каналу в програму тренувань нічної зміни.",
+        "status": "proposed",
+        "auto_validated_at": null,
+        "regressed_at": null
+      },
+      {
+        "id": 93,
+        "text": "Оновлювати карту РЕБ-обстановки безпосередньо перед вильотом.",
+        "status": "in_progress",
+        "auto_validated_at": null,
+        "regressed_at": "2026-07-02T09:15:00Z"
+      }
+    ]
+  },
+  {
     "report_id": 287,
     "case_id": 39,
     "case_title": "Зрив каналу керування на межі РЕБ-зони",
