@@ -10,7 +10,7 @@
 **Поточна версія:** v1.8.0 (= v1.1 + Waves 1–10: … + Telegram notifications + geo map + dictionary CRUD)
 **Активна гілка розробки:** `claude/equipment-tracking-system-3lB6U`
 **Жива демо-версія:** https://yevhen-sh8.github.io/AAR/
-**Робочий деплой (як підняти):** `docs/DEPLOY.md` (Render Blueprint, ~5 хв)
+**Робочий деплой (як підняти):** `docs/DEPLOY.md` (Docker Compose у себе / на VM)
 
 ---
 
@@ -249,20 +249,24 @@ launched-pool. Для повної інтерпретації див. `docs/metr
   (`test_analogies_searches_only_validated_assets`).
 
 ### Wave 4 — Робочий деплой (production)
-- `render.yaml` (корінь) — Render Blueprint: безкоштовний Postgres + API
-  (Docker) + Web (статика) одним кліком у браузері. Деталі — `docs/DEPLOY.md`.
+- ~~`render.yaml`~~ — **видалено (серпень 2026).** Робочий контур розгортався
+  на Render Blueprint, поки вистачало безкоштовного плану. Тепер розгортання
+  своє: `infra/docker-compose.yml` локально або на VM (`docs/DEPLOY.md`).
+  Vercel лишився **виключно як demo-вітрина** — статика на синтетичних даних,
+  без бекенду.
 - `apps/api/start.sh` — entrypoint контейнера: `alembic upgrade head` →
   ідемпотентний seed (за `AAR_SEED_ON_START`) → `uvicorn` на `$PORT`.
-  Платформонезалежний (Render/Fly/Railway).
+  Платформонезалежний — саме тому перехід із Render на власний хост не
+  потребував змін у коді.
 - `core/config.py` — нормалізація БД-URL: `postgres://`/`postgresql://` →
   `postgresql+asyncpg://` (+ зрізання `?sslmode=` для asyncpg). CORS тепер з
-  env: `AAR_CORS_ORIGINS` (список) + `AAR_CORS_ORIGIN_REGEX` (для
-  `*.onrender.com`). Прапор `AAR_SEED_ON_START`.
+  env: `AAR_CORS_ORIGINS` (список) + `AAR_CORS_ORIGIN_REGEX` (необов'язковий
+  шаблон). Прапор `AAR_SEED_ON_START`.
 - `main.py` — CORS будується з налаштувань (origins + optional regex).
 - `Dockerfile` (API) — копіює `start.sh`, ставить його як CMD, виставляє
   права; слухає `$PORT`.
 - Фронтенд live-режим: `apps/web/src/lib/api.ts` читає `VITE_API_BASE` —
-  абсолютний URL бекенду (Render зашиває його в бандл під час білду). Default
+  абсолютний URL бекенду (зашивається в бандл під час білду). Default
   лишається `/api` (nginx/vite-proxy).
 - CI: нова джоба `migrations` — `alembic upgrade head` на чистій БД +
   downgrade→upgrade roundtrip. Ловить клас багів, який тести (create_all)
@@ -504,6 +508,13 @@ security / consistency / ux, кожна знахідка → окремий аг
 ---
 
 ## 6. Рішення (ADR-журнал, скорочено)
+
+> **Примітка (серпень 2026).** ADR-017…020 ухвалювались у контексті деплою на
+> Render. Від Render відмовились (безкоштовний план перестав покривати
+> потреби), `render.yaml` видалено. Самі рішення лишаються чинними — вони про
+> нормалізацію БД-URL, розділення фронтенду й бекенду, in-process rate-limit і
+> JSON-бекап, а не про конкретного провайдера. Текст ADR не переписуємо:
+> журнал рішень — історичний запис, а не опис поточного стану.
 
 > **Це канонічний журнал архітектурних рішень проєкту (ADR-001…022).**
 > `docs/PROJECT.md` §6 посилається сюди й не веде власної нумерації.

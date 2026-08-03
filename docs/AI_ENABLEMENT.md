@@ -67,11 +67,14 @@ AAR використовує LLM у двох місцях. Обидва **нео
 
 ## 4. Як увімкнути
 
-1. Render → сервіс **aar-api** → **Environment**.
-2. Додати `AAR_ANTHROPIC_API_KEY` = ключ із console.anthropic.com.
-3. Встановити `AAR_LLM_ENABLED=true`.
-4. (Опційно) задати моделі: `AAR_LLM_DEFAULT_MODEL`, `AAR_LLM_FAST_MODEL`.
-5. Зберегти → сервіс передеплоїться.
+1. У `infra/docker-compose.yml`, сервіс `api`, розділ `environment`:
+   - `AAR_ANTHROPIC_API_KEY` = ключ із console.anthropic.com;
+   - `AAR_LLM_ENABLED: "true"`.
+2. (Опційно) моделі: `AAR_LLM_DEFAULT_MODEL`, `AAR_LLM_FAST_MODEL`.
+3. `docker compose up -d --build api`.
+
+> Ключ задається **лише у власному контурі**. У demo-збірці (Vercel / GitHub
+> Pages) бекенду немає взагалі, тож ШІ там не працює й ключ туди не потрапляє.
 
 **Перевірка:** Брифінг місії → «Синтез ШІ» має видати реальний результат.
 Якщо ключа/прапорця немає — ендпойнт синтезу віддає **503** (а UI показує, що

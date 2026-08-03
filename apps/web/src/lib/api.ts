@@ -4,7 +4,7 @@ const DEMO = import.meta.env.VITE_DEMO === "true";
 
 // Live API base resolution:
 //   - demo build        → static mock JSON under <base>/mock
-//   - VITE_API_BASE set  → absolute backend URL (e.g. https://aar-api.onrender.com/api)
+//   - VITE_API_BASE set  → absolute backend URL (e.g. https://aar.example.com/api)
 //   - otherwise          → same-origin "/api" (nginx proxy / vite dev proxy)
 function safeBase(raw: string): string {
   if (!raw) return "/api";

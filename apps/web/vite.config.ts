@@ -25,7 +25,7 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//, /\/api\//],
         runtimeCaching: [
           {
-            // Only cache *same-origin GET* reads. Cross-origin API (Render
+            // Only cache *same-origin GET* reads. Cross-origin API (a separate
             // split-host) and all mutations bypass the service worker entirely,
             // which avoids opaque "string did not match the expected pattern"
             // fetch failures on iOS/Safari PWAs.

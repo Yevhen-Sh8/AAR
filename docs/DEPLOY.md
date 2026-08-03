@@ -1,223 +1,159 @@
-# DEPLOY — робочий додаток у проді (Wave 4)
+# DEPLOY — розгортання
 
-> Мета: перетворити demo на **справді робочий додаток** — з реальним записом
-> даних, базою, імпортом, AAR-кейсами. Усе керується з браузера, локально нічого
-> ставити не треба.
+> **Render більше не використовується.** Безкоштовний план вичерпано, тож
+> `render.yaml` видалено з репозиторію. Робочий контур тепер розгортається
+> **у себе** (Docker Compose на своїй машині або на VM).
+>
+> **Vercel лишається — але тільки як демонстраційна вітрина.** Там публікується
+> виключно demo-збірка: статичний фронтенд на синтетичних даних, **без бекенду
+> й без бази**. Показати можливості та інтерфейс — так; працювати з реальними
+> даними — ні.
 
-## TL;DR — найшвидший шлях (Render Blueprint, ~5 хв, безкоштовно)
+| Контур | Де | Дані | Для чого |
+|---|---|---|---|
+| **Demo** | Vercel (і GitHub Pages) | синтетичні, зашиті у збірку | показ інтерфейсу |
+| **Робочий** | своя машина / VM (Docker) | справжні, у Postgres | пілот і експлуатація |
 
-1. Відкрий <https://dashboard.render.com> → зареєструйся через GitHub.
-2. **New → Blueprint**.
-3. Обери репозиторій `yevhen-sh8/aar` і потрібну гілку.
-4. Render прочитає `render.yaml` у корені й покаже, що створить:
-   - **aar-db** — безкоштовний Postgres 16;
-   - **aar-api** — бекенд (Docker, FastAPI);
-   - **aar-web** — фронтенд (статичний сайт, React PWA).
-5. Натисни **Apply**. Перший білд ~5 хв.
-6. Бекенд при старті сам:
-   - застосує всі міграції (`alembic upgrade head`);
-   - засіє синтетичні дані (ідемпотентно — повторно не дублює).
-7. Відкрий URL сервісу **aar-web** (вигляду `https://aar-web.onrender.com`) —
-   повноцінний робочий додаток. Кнопки «створити подію», «імпорт»,
-   «валідувати» тепер реально пишуть у БД.
+---
 
-Готово. Жодного рядка в терміналі.
+## 1. Робочий контур — Docker Compose
 
-### Вхід у застосунок (Wave 5)
+Єдина команда, усе локально:
 
-Додаток закритий за паролем (окрім GitHub Pages demo — там логіну немає).
-Бекенд сам створює адміністратора при старті:
-
-- **Email:** значення `AAR_ADMIN_EMAIL` (за замовчуванням `admin@aar.local`).
-- **Пароль:** значення `AAR_ADMIN_PASSWORD` (за замовчуванням `aar-admin-2026`,
-  якщо змінну не задано).
-
-**Щоб змінити пароль:** Render → сервіс **aar-api** → **Environment** →
-онови `AAR_ADMIN_PASSWORD` → **Save Changes**. Render автоматично
-передеплоїть сервіс, і при наступному старті пароль адміністратора
-синхронізується з новим значенням — це працює при **кожному** рестарті
-(не лише при першому створенні), тож зміна пароля через дашборд завжди
-діє одразу після редеплою.
-
-### Увімкнути AI-функції (опційно)
-
-LLM-чернетки аналізу, класифікація причин, пошук аналогій — вимкнені за
-замовчуванням (щоб не вимагати ключа). Щоб увімкнути:
-
-1. Render → сервіс **aar-api** → **Environment**.
-2. Додай `AAR_ANTHROPIC_API_KEY` = твій ключ Anthropic.
-3. Зміни `AAR_LLM_ENABLED` на `true`.
-4. **Manual Deploy → Deploy latest commit** (або зачекай авто-деплой).
-
-## Що відбувається під капотом
-
-| Компонент | Як деплоїться | Нюанси free-плану |
-|---|---|---|
-| Postgres | `databases:` у `render.yaml`, plan free | 90 днів, потім потрібен новий free-інстанс або платний |
-| API (FastAPI) | Docker з `apps/api/Dockerfile`; entrypoint `start.sh` | Засинає після 15 хв простою; перший запит після сну ~30–60 с |
-| Web (React) | Статичний сайт, build з `VITE_API_BASE` на URL API | CDN, не засинає |
-
-**`start.sh`** (entrypoint контейнера API) робить три речі:
-```sh
-alembic upgrade head                 # міграції
-[ "$AAR_SEED_ON_START" = "true" ] && python -m aar_api.scripts.seed
-exec uvicorn aar_api.main:app --host 0.0.0.0 --port $PORT
-```
-
-**Нормалізація БД-URL.** Render видає `postgresql://…` без асинхронного драйвера.
-`core/config.py` автоматично конвертує його в `postgresql+asyncpg://…` (а для
-синхронного Alembic драйвер відрізається в `alembic/env.py`). Той самий
-`AAR_DATABASE_URL` працює і локально, і в проді.
-
-**CORS.** `AAR_CORS_ORIGINS` — явний allow-list (через кому): `aar-web` +
-GitHub Pages demo. Якщо `AAR_CORS_ORIGINS` містить `*`, бекенд перемикається
-в bullet-proof pilot-режим (echo `*` без credentials) — зручно на самому
-старті, коли фінальний домен ще невідомий, але для проду тримай явний список.
-
-**Security headers.** Кожна відповідь API несе `X-Content-Type-Options`,
-`X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`,
-`Strict-Transport-Security` і `Content-Security-Policy` (окрема, м'якша
-політика на `/docs`/`/redoc`, бо Swagger UI тягне бандл з CDN).
-
-**Rate limiting входу.** `/auth/login` обмежений — за замовчуванням 20 спроб
-на 5 хвилин з одного IP (`AAR_LOGIN_RATE_LIMIT_ATTEMPTS` /
-`AAR_LOGIN_RATE_LIMIT_WINDOW_SECONDS`). Ліміт живе в пам'яті процесу (без
-Redis) — скидається при рестарті контейнера; достатньо для одного
-pilot-інстансу, не для розподіленої атаки.
-
-## Змінні середовища API (префікс `AAR_`)
-
-| Змінна | Призначення | Прод-значення |
-|---|---|---|
-| `AAR_DATABASE_URL` | Async Postgres DSN | з `aar-db` (auto) |
-| `AAR_JWT_SECRET` | Підпис JWT | генерується Render |
-| `AAR_ENVIRONMENT` | `development`/`production` | `production` |
-| `AAR_SEED_ON_START` | Засіяти демо-дані на старті | `true` (вимкни після пілота) |
-| `AAR_CORS_ORIGINS` | Дозволені origin'и (через кому) | `https://yevhen-sh8.github.io` |
-| `AAR_CORS_ORIGIN_REGEX` | Regex дозволених origin'ів | `https://.*\.onrender\.com` |
-| `AAR_LLM_ENABLED` | Увімкнути LLM | `false` (поки без ключа) |
-| `AAR_ANTHROPIC_API_KEY` | Ключ Anthropic | (порожньо; задай вручну) |
-| `AAR_ADMIN_EMAIL` | Email bootstrap-адміна | `admin@aar.local` |
-| `AAR_ADMIN_PASSWORD` | Пароль bootstrap-адміна (синхронізується при кожному старті) | задай вручну в дашборді |
-| `AAR_LOGIN_RATE_LIMIT_ATTEMPTS` | Спроб входу на вікно | `20` |
-| `AAR_LOGIN_RATE_LIMIT_WINDOW_SECONDS` | Тривалість вікна (с) | `300` |
-
-## Локальний перегляд через Docker Compose (найшвидше «подивитись»)
-
-Повний контур у себе, однією командою:
 ```bash
 cd infra
-docker compose up --build      # перший раз збирає образи (~2–4 хв)
+docker compose up --build          # перший раз ~2–4 хв
 # Веб:  http://localhost:8080
-# API:  http://localhost:8000/api  (доки: http://localhost:8000/api/docs)
+# API:  http://localhost:8000/api   (доки: /api/docs)
 ```
-Compose піднімає Postgres + Redis + api + web. `api` через `start.sh` **сам
-застосовує міграції й засідає демо-дані** (`AAR_SEED_ON_START=true` у compose):
-створюється bootstrap-адмін і ~3000 синтетичних подій — стенд одразу робочий.
 
-**Вхід:** `admin@aar.local` / `aar-admin-2026` (значення `AAR_ADMIN_EMAIL` /
-`AAR_ADMIN_PASSWORD` у `infra/docker-compose.yml` — змініть за потреби).
+Піднімається Postgres 16 + Redis + api + web. Контейнер `api` через `start.sh`
+сам застосовує міграції й засіває демо-дані (`AAR_SEED_ON_START=true`), тож
+стенд одразу робочий.
 
-Порожня БД без демо-даних: у compose постав `AAR_SEED_ON_START: "false"`.
-Скинути все (видалити том БД): `docker compose down -v`.
+**Вхід:** `admin@aar.local` / `aar-admin-2026` — значення `AAR_ADMIN_EMAIL` та
+`AAR_ADMIN_PASSWORD` в `infra/docker-compose.yml`. **Змініть їх перед будь-яким
+використанням поза власною машиною.**
 
-> Потрібен лише встановлений Docker Desktop / Docker Engine + compose-плагін.
-> Це найкращий варіант «побачити, що вийшло» без жодного хостингу.
+Порожня база без демо-даних: `AAR_SEED_ON_START: "false"`.
+Скинути все разом із томом БД: `docker compose down -v`.
 
-## Self-hosted VM (постійний публічний демо замість Render/Vercel)
+## 2. Робочий контур — VM із публічним доступом
 
-Коли безкоштовні хостинги відпали, найдешевший стабільний варіант — маленька
-VM із тим самим compose за реверс-проксі Caddy (авто-HTTPS Let's Encrypt).
+Коли потрібен постійний адрес для підрозділу.
 
-**Параметри VM (мінімум):** 1 vCPU / 2 ГБ RAM / 20 ГБ SSD, Ubuntu 22.04/24.04.
-Приклади: Hetzner CX22 (~€4/міс), DigitalOcean/Vultr basic (~$6/міс),
-Fly.io/Railway paid. Для 2 ГБ RAM вистачає; при seed-збірці 1 ГБ буває впритул.
+**Мінімум:** 1 vCPU / 2 ГБ RAM / 20 ГБ SSD, Ubuntu 22.04+.
 
-**Кроки:**
 ```bash
-# 1) на VM: поставити Docker + compose-плагін
+# 1) Docker
 curl -fsSL https://get.docker.com | sh
 
-# 2) отримати код
+# 2) код
 git clone https://github.com/Yevhen-Sh8/AAR.git && cd AAR/infra
 
-# 3) ЗМІНИТИ секрети у docker-compose.yml перед підняттям:
-#    AAR_JWT_SECRET (довгий випадковий), AAR_ADMIN_PASSWORD,
-#    POSTGRES_PASSWORD + відповідний AAR_DATABASE_URL.
-#    Для публічного демо лишайте AAR_SEED_ON_START=true (лише СИНТЕТИЧНІ дані).
+# 3) ОБОВ'ЯЗКОВО змінити в docker-compose.yml перед підняттям:
+#    AAR_JWT_SECRET        — довгий випадковий рядок
+#    AAR_ADMIN_PASSWORD    — свій пароль
+#    POSTGRES_PASSWORD     — свій, і синхронно AAR_DATABASE_URL
 
-# 4) підняти у фоні
+# 4) підняти
 docker compose up -d --build
 ```
 
-**HTTPS + домен (Caddy).** Додайте в `infra/docker-compose.yml` сервіс:
+**HTTPS і домен** — Caddy отримує сертифікат сам:
+
 ```yaml
   caddy:
     image: caddy:2-alpine
     depends_on: [web]
     ports: ["80:80", "443:443"]
-    command: caddy reverse-proxy --from https://demo.example.com --to web:80
+    command: caddy reverse-proxy --from https://aar.example.com --to web:80
     volumes: ["caddy_data:/data"]
-# і додайте `caddy_data:` у розділ volumes.
+# додайте caddy_data: у розділ volumes
 ```
-Наведіть A-запис `demo.example.com` на IP VM — Caddy сам випустить сертифікат.
-Тоді приберіть публічний проброс порту 8080 у `web` (лишіть лише всередині
-compose-мережі), щоб зовні був тільки HTTPS.
 
-> ⚠ Оборонний контекст: публічний VM-демо тримайте **виключно на синтетичних
-> даних**. Реальні операційні дані — лише в закритому контурі замовника
-> (приватна мережа/VPN, без публічного URL, ISO 27001 — див. нижче).
+Наведіть A-запис на IP машини. Після цього приберіть публічний проброс порту
+`8080` у сервісі `web`, щоб зовні лишився тільки HTTPS.
 
-## Альтернатива: Fly.io / Railway
+## 3. Demo-контур (Vercel / GitHub Pages)
 
-`render.yaml` специфічний для Render, але `apps/api/Dockerfile` + `start.sh`
-платформонезалежні. Для Fly: `fly launch` у `apps/api`, додай Postgres
-(`fly postgres create`), прокинь `AAR_DATABASE_URL`, вистав `PORT` (Fly робить
-це сам). Той самий entrypoint застосує міграції й підніме сервер.
+Demo — це **та сама фронтенд-збірка з прапорцем `VITE_DEMO=true`**. У цьому
+режимі `apiFetch` не ходить у мережу: усі запити підміняються статичними JSON з
+`apps/web/public/mock/`. Бекенду немає, запис вимкнено, логіну немає.
 
-## Підключити наявний GitHub Pages demo до живого бекенду
+- **Vercel** — `apps/web/vercel.json` жорстко задає demo-збірку
+  (`VITE_DEMO=true`), тож будь-який деплой звідти автоматично демонстраційний.
+  Змінювати це не треба: живий контур на Vercel ми свідомо не піднімаємо.
+- **GitHub Pages** — `.github/workflows/pages.yml`, той самий demo з
+  `VITE_BASE=/AAR/`.
 
-Demo на Pages за замовчуванням read-only (mock-дані). Щоб він ходив у живий
-Render-бекенд: у `.github/workflows/pages.yml` додай до build-кроку
-`VITE_API_BASE=https://aar-api.onrender.com/api` і прибери `VITE_DEMO=true`.
-Тоді Pages-фронтенд стане живим клієнтом прод-API (CORS уже дозволяє
-`github.io`). Рекомендація: лиши Pages як demo-вітрину, а робочий додаток
-тримай на `aar-web.onrender.com` — менше плутанини.
+> Публічне demo тримати **лише на синтетичних даних**. Реальні операційні дані —
+> тільки у власному контурі (п.1–2), у закритій мережі.
 
-## Перевірка після деплою
+## 4. Змінні середовища API (префікс `AAR_`)
 
-1. `https://aar-api.onrender.com/health/live` → `{"status":"ok",...}`.
-2. `https://aar-api.onrender.com/health/ready` → `{"status":"ready"}` (БД жива).
-3. Відкрий aar-web → Дашборд показує засіяні дані.
-4. Подай подію → онови Дашборд → число змінилось (реальний запис у БД).
-5. Відкрий кейс → «Згенерувати аналіз (LLM)» (якщо ключ заданий) → аналіз
-   зберігається в кейсі.
+| Змінна | Призначення | Типове значення |
+|---|---|---|
+| `DATABASE_URL` | Підключення до Postgres | `postgresql+asyncpg://aar:aar@db:5432/aar` |
+| `JWT_SECRET` | Підпис токенів | **обов'язково змінити** |
+| `ENVIRONMENT` | `development` \| `production` | `production` для робочого контуру |
+| `ADMIN_EMAIL` | Email адміністратора | `admin@aar.local` |
+| `ADMIN_PASSWORD` | Пароль адміністратора | **обов'язково змінити** |
+| `SEED_ON_START` | Засівати демо-дані | `true` локально, `false` у бою |
+| `CORS_ORIGINS` | Дозволені джерела (через кому) | адреса вашого фронтенду |
+| `ANTHROPIC_API_KEY` | Ключ ШІ | не задано = ШІ вимкнено |
+| `LLM_ENABLED` | Вмикач ШІ | `false` |
+| `LOGIN_RATE_LIMIT_ATTEMPTS` | Спроб входу на вікно | `20` |
+| `LOGIN_RATE_LIMIT_WINDOW_SECONDS` | Вікно, секунд | `300` |
 
-## Резервне копіювання (Wave 5, тільки браузер)
+> `ENVIRONMENT=development` **вимикає перевірку автентифікації** — це режим для
+> розробки й тестів. Для будь-якого контуру з реальними даними має бути
+> `production`.
 
-Безкоштовний план Postgres на Render **не робить автоматичних бекапів** і
-**видаляється через 90 днів**. Оскільки цей деплой керується виключно з
-браузера (без терміналу), звичайний `pg_dump` тут не варіант день-у-день.
+## 5. Увімкнути ШІ (опційно)
 
-**Що є зараз:** Налаштування → «Резервна копія» → кнопка «Завантажити
-резервну копію (JSON)» — авторизований (роль admin) ендпойнт
-`GET /admin/export` віддає повний JSON-знімок робочих таблиць
-(довідники, вироби, події, AAR-кейси, рекомендації, контекст-активи,
-користувачі без хешів паролів) як файл для завантаження в браузер.
-Рекомендація: раз на тиждень під час пілоту.
+1. Задати `AAR_ANTHROPIC_API_KEY` і `AAR_LLM_ENABLED=true`.
+2. Перезапустити `api`.
+3. Перевірка: «Брифінг місії» → **Синтез ШІ** дає результат.
 
-**Чого це НЕ замінює:** це не point-in-time recovery і не автоматичний
-процес. Для реального проду — онови план Postgres на Render до платного
-(додає щоденні бекапи + PITR) або постав окремий cron, що регулярно тягне
-`/admin/export` і зберігає файл десь поза Render.
+Без ключа система працює повністю, крім ШІ-синтезу й LLM-чернеток.
+**Перед увімкненням прочитайте `docs/AI_ENABLEMENT.md` §3** — там точний перелік
+даних, що йдуть у зовнішній API. Для секретних контурів лишайте вимкненим.
 
-## Безпека прод-контуру (ISO/IEC 27001)
+## 6. Перевірка після розгортання
 
-Перед бойовим використанням (не пілотом) — див.
-`docs/normative/iso-27001-controls.md`. Ключове, що НЕ покрито free-деплоєм і
-потребує рішення:
-- шифрування at-rest (Render шифрує диски; для суверенного контуру — LUKS/TDE);
-- справжній point-in-time backup/restore (платний план Postgres — JSON-експорт
-  вище лише супровідна страховка, не заміна);
-- ротація секретів і JWT;
-- приватна мережа / VPN-доступ замість публічного URL.
+1. `<адреса>/api/health/live` → `{"status":"ok"}`.
+2. `<адреса>/api/health/ready` → `{"status":"ready"}` (база жива).
+3. Відкрити веб → Дашборд показує дані.
+4. Подати подію → оновити Дашборд → число змінилось (запис у БД реальний).
+5. Відкрити кейс із поданими звітами → **Згенерувати аналіз (LLM)**, якщо ключ
+   заданий.
+
+## 7. Резервне копіювання
+
+**Що є:** Налаштування → «Резервна копія» → JSON-знімок робочих таблиць
+(`GET /admin/export`, роль admin). Раз на тиждень під час пілоту, зберігати
+поза сервером.
+
+**Чого це не замінює:** це не point-in-time recovery. У власному контурі
+робіть звичайний `pg_dump` за розкладом:
+
+```bash
+docker compose exec -T db pg_dump -U aar aar | gzip > aar-$(date +%F).sql.gz
+```
+
+## 8. Безпека бойового контуру (ISO/IEC 27001)
+
+Перед бойовим використанням — `docs/normative/iso-27001-controls.md`. Ключове,
+що потребує рішення власника контуру:
+
+- шифрування at-rest (LUKS на диску VM або TDE у Postgres);
+- регулярний `pg_dump` + перевірка відновлення (restore-drill), не лише JSON;
+- ротація секретів і `JWT_SECRET`;
+- приватна мережа / VPN замість публічного URL;
+- `ENVIRONMENT=production` (інакше автентифікація вимкнена).
+
+---
+*Історія: до серпня 2026 робочий контур розгортався на Render Blueprint
+(`render.yaml`). Від нього відмовились, коли безкоштовний план перестав
+покривати потреби; файл видалено, щоб не лишати неробочої інструкції.*

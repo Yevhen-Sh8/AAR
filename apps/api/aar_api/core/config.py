@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     jwt_expires_minutes: int = 60 * 8
 
     # CORS — comma-separated allow-list of exact origins, plus an optional regex
-    # (used in production to permit any *.onrender.com preview/static host).
+    # (e.g. to permit a preview-host wildcard). Leave empty unless needed.
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
     cors_origin_regex: str = ""
 
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _normalize_async_db_url(cls, v: str) -> str:
-        """Managed Postgres providers (Render, Heroku, Railway) hand out a URL
+        """Managed Postgres providers (Heroku, Railway, …) hand out a URL
         like ``postgres://…`` or ``postgresql://…`` with no async driver.
         asyncpg needs the ``+asyncpg`` scheme; normalise it here so the same
         env var works locally and in production. SQLite / already-qualified
