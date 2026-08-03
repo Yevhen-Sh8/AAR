@@ -27,6 +27,9 @@ export const API_BASE = safeBase(import.meta.env.VITE_API_BASE || "/api");
 const BASE = DEMO ? `${import.meta.env.BASE_URL}mock` : API_BASE;
 
 const MOCK_ROUTES: Record<string, string> = {
+  // More specific /aar prefixes first — matching is startsWith.
+  "/aar/my-report-requests": "/my-report-requests.json",
+  "/aar/my-observations": "/my-observations.json",
   "/reports/monthly": "/monthly.json",
   "/reports/daily": "/daily.json",
   "/aar/cases": "/cases.json",

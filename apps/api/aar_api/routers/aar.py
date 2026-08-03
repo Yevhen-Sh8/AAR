@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.db import get_session
@@ -27,6 +27,9 @@ from aar_api.schemas.aar import (
     CaseTransitionIn,
     IndividualReportIn,
     IndividualReportOut,
+    MyObservationOut,
+    MyObservationRecommendationOut,
+    MyReportRequestOut,
     RecommendationIn,
     RecommendationOut,
     RecommendationStatusUpdate,
@@ -613,3 +616,163 @@ async def run_triggers(
         auto_validated_recommendation_ids=auto_validated,
         regressed_recommendation_ids=regressed,
     )
+
+
+# ---------------------------------------------------------------------------
+# Participant-facing surface (Wave 12)
+# ---------------------------------------------------------------------------
+
+def _require_uid(claims: dict | None) -> int:
+    """Identity is mandatory here — these endpoints are "mine", not "all".
+
+    Deliberately uses optional_claims rather than require_role: require_role
+    short-circuits to ADMIN in development (which is also the test env) and
+    yields no uid, so reusing it would make "my reports" mean "everyone's".
+    """
+    uid = (claims or {}).get("uid")
+    if not isinstance(uid, int):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="потрібен вхід: ці дані персональні",
+        )
+    return uid
+
+
+def _outcome_phrase(case: AARCase, recs: list[Recommendation]) -> str:
+    """Say what came of the testimony, in the author's terms.
+
+    "Прийнято" is exactly the useless acknowledgement this endpoint exists to
+    replace, so every branch names a consequence instead.
+    """
+    validated = [r for r in recs if r.status == RecommendationStatus.VALIDATED]
+    if validated:
+        return (
+            f"Зміна впроваджена і підтверджена даними "
+            f"({len(validated)} з {len(recs)} рекомендацій)."
+        )
+    done = [r for r in recs if r.status == RecommendationStatus.DONE]
+    if done:
+        return f"Зміну впроваджено, очікує підтвердження даними ({len(done)})."
+    in_progress = [r for r in recs if r.status == RecommendationStatus.IN_PROGRESS]
+    if in_progress:
+        return f"За вашим звітом виконується зміна ({len(in_progress)})."
+    if recs:
+        return f"За вашим звітом запропоновано зміну ({len(recs)}), ще не почато."
+    if case.lesson_identified:
+        return "З вашого звіту сформульовано урок; конкретної зміни ще не призначено."
+    if case.analysis:
+        return "Ваш звіт увійшов в аналіз кейсу; урок ще не сформульовано."
+    return "Звіт отримано, розбір кейсу ще триває."
+
+
+@router.get("/my-report-requests", response_model=list[MyReportRequestOut])
+async def my_report_requests(
+    include_submitted: bool = Query(default=True),
+    session: AsyncSession = Depends(get_session),
+    claims: dict | None = Depends(optional_claims),
+) -> list[MyReportRequestOut]:
+    """What has been asked of ME.
+
+    Without this a participant is notified by webhook that a report is wanted
+    and then has no way to find out which case it concerns — the request lived
+    only in the manager's screen.
+    """
+    uid = _require_uid(claims)
+    stmt = (
+        select(IndividualReport, AARCase)
+        .join(AARCase, AARCase.id == IndividualReport.case_id)
+        .where(
+            or_(
+                IndividualReport.requested_for_user_id == uid,
+                IndividualReport.user_id == uid,
+            )
+        )
+        .order_by(IndividualReport.id.desc())
+    )
+    if not include_submitted:
+        stmt = stmt.where(IndividualReport.submitted_at.is_(None))
+    rows = (await session.execute(stmt)).all()
+    return [
+        MyReportRequestOut(
+            report_id=rep.id,
+            case_id=case.id,
+            case_title=case.title,
+            case_status=case.status,
+            requested_at=rep.requested_at,
+            submitted_at=rep.submitted_at,
+            anonymous=rep.anonymous,
+            function=rep.function,
+        )
+        for rep, case in rows
+    ]
+
+
+@router.get("/my-observations", response_model=list[MyObservationOut])
+async def my_observations(
+    session: AsyncSession = Depends(get_session),
+    claims: dict | None = Depends(optional_claims),
+) -> list[MyObservationOut]:
+    """What CAME OF my testimony — the loop back to the author.
+
+    ANONYMITY CAVEAT, stated rather than hidden: a report submitted anonymously
+    against a request stub is still findable here via requested_for_user_id
+    (redacted from everyone else, per services/redaction.py). A fully anonymous
+    report submitted with no stub has neither user_id nor requested_for_user_id
+    and is therefore untraceable BY DESIGN — including to its own author, who
+    consequently loses this feedback. That is the real price of unconditional
+    anonymity, not an oversight.
+    """
+    uid = _require_uid(claims)
+    rows = (
+        await session.execute(
+            select(IndividualReport, AARCase)
+            .join(AARCase, AARCase.id == IndividualReport.case_id)
+            .where(
+                IndividualReport.submitted_at.is_not(None),
+                or_(
+                    IndividualReport.user_id == uid,
+                    IndividualReport.requested_for_user_id == uid,
+                ),
+            )
+            .order_by(IndividualReport.submitted_at.desc())
+        )
+    ).all()
+    if not rows:
+        return []
+
+    case_ids = {case.id for _, case in rows}
+    rec_rows = list(
+        await session.scalars(
+            select(Recommendation).where(Recommendation.case_id.in_(case_ids))
+        )
+    )
+    by_case: dict[int, list[Recommendation]] = {}
+    for rec in rec_rows:
+        by_case.setdefault(rec.case_id, []).append(rec)
+
+    out: list[MyObservationOut] = []
+    for rep, case in rows:
+        recs = by_case.get(case.id, [])
+        out.append(
+            MyObservationOut(
+                report_id=rep.id,
+                case_id=case.id,
+                case_title=case.title,
+                case_status=case.status,
+                submitted_at=rep.submitted_at,
+                anonymous=rep.anonymous,
+                outcome_uk=_outcome_phrase(case, recs),
+                lesson_identified=case.lesson_identified,
+                recommendations=[
+                    MyObservationRecommendationOut(
+                        id=r.id,
+                        text=r.text,
+                        status=r.status,
+                        auto_validated_at=r.auto_validated_at,
+                        regressed_at=r.regressed_at,
+                    )
+                    for r in recs
+                ],
+            )
+        )
+    return out

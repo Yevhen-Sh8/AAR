@@ -1,0 +1,39 @@
+[
+  {
+    "report_id": 287,
+    "case_id": 39,
+    "case_title": "Зрив каналу керування на межі РЕБ-зони",
+    "case_status": "validated",
+    "submitted_at": "2026-06-11T18:40:00Z",
+    "anonymous": false,
+    "outcome_uk": "Через ваше зауваження змінено процедуру виходу на рубіж: тепер перевірка каналу обов'язкова за 2 км до РЕБ-зони.",
+    "lesson_identified": "Перевірка каналу керування безпосередньо перед входом у РЕБ-зону скорочує втрати на маршруті.",
+    "recommendations": [
+      {
+        "id": 88,
+        "text": "Внести контроль каналу за 2 км до рубежу в чек-лист передпольотної підготовки.",
+        "status": "validated",
+        "auto_validated_at": "2026-07-20T10:00:00Z",
+        "regressed_at": null
+      },
+      {
+        "id": 89,
+        "text": "Довести оновлений чек-лист до всіх екіпажів підрозділу.",
+        "status": "done",
+        "auto_validated_at": null,
+        "regressed_at": null
+      }
+    ]
+  },
+  {
+    "report_id": 301,
+    "case_id": 44,
+    "case_title": "Перегрів акумуляторів у липневу спеку",
+    "case_status": "open",
+    "submitted_at": "2026-07-19T07:25:00Z",
+    "anonymous": true,
+    "outcome_uk": "Звіт отримано, розбір кейсу ще триває.",
+    "lesson_identified": null,
+    "recommendations": []
+  }
+]

@@ -196,3 +196,52 @@ class TriggerResult(BaseModel):
     skipped_existing: int
     auto_validated_recommendation_ids: list[int] = []
     regressed_recommendation_ids: list[int] = []
+
+
+# ---------------------------------------------------------------------------
+# Participant-facing surface (Wave 12)
+#
+# The single function the Parallax Debrief concept names as decisive: the
+# author of an observation must see what CAME OF IT — not "your report was
+# received" but "this procedure changed because of what you wrote". Without
+# it their modelling puts submission at 14% instead of 68%, and a Level-2
+# system with no testimony is just a metrics dashboard.
+# ---------------------------------------------------------------------------
+
+class MyReportRequestOut(BaseModel):
+    """A report the current user has been asked for (or has already given)."""
+
+    model_config = ConfigDict(from_attributes=True)
+    report_id: int
+    case_id: int
+    case_title: str
+    case_status: CaseStatus
+    requested_at: datetime | None
+    submitted_at: datetime | None
+    anonymous: bool
+    function: ParticipantFunction | None = None
+
+
+class MyObservationRecommendationOut(BaseModel):
+    """A concrete change that traces back to the user's testimony."""
+
+    id: int
+    text: str
+    status: RecommendationStatus
+    auto_validated_at: datetime | None = None
+    regressed_at: datetime | None = None
+
+
+class MyObservationOut(BaseModel):
+    """What became of one submitted report."""
+
+    report_id: int
+    case_id: int
+    case_title: str
+    case_status: CaseStatus
+    submitted_at: datetime | None
+    anonymous: bool
+    # The outcome, in the author's terms — deliberately a sentence, not a code.
+    outcome_uk: str
+    lesson_identified: str | None = None
+    recommendations: list[MyObservationRecommendationOut] = []
