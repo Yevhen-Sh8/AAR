@@ -72,6 +72,14 @@ async def create_event(
         loss_reason_id=loss_id,
         repair_reason_id=repair_id,
         notes=payload.notes,
+        # Accepted by the schema and then silently dropped here, so `aborted`
+        # was False for EVERY event ever created through the API or import.
+        # That killed the whole MSR-narrow / MSR-full distinction (Wave 2):
+        # abort counters read zero everywhere and MSR-full equalled MSR-narrow
+        # by construction — a metric that cannot differ from the one beside it
+        # is not a second opinion, it is decoration.
+        aborted=payload.aborted,
+        abort_reason=payload.abort_reason,
     )
     session.add(event)
     await session.flush()
@@ -229,6 +237,14 @@ async def _persist_event(
         loss_reason_id=loss_id,
         repair_reason_id=repair_id,
         notes=payload.notes,
+        # Accepted by the schema and then silently dropped here, so `aborted`
+        # was False for EVERY event ever created through the API or import.
+        # That killed the whole MSR-narrow / MSR-full distinction (Wave 2):
+        # abort counters read zero everywhere and MSR-full equalled MSR-narrow
+        # by construction — a metric that cannot differ from the one beside it
+        # is not a second opinion, it is decoration.
+        aborted=payload.aborted,
+        abort_reason=payload.abort_reason,
     )
     session.add(event)
     await session.flush()
