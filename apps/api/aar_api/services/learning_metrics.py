@@ -94,9 +94,16 @@ async def compute_loop_kpi(
     period_from = period_from or (period_to - timedelta(days=90))
 
     # ─────────────── Cycle speed ───────────────
+    # Both bounds: the docstring promises period_to filters the case-open
+    # window too, but only the lower bound was applied — so asking for a
+    # historical window still folded in every case opened after it, quietly
+    # inflating time-to-validation, LI→LL conversion and OPR load.
     case_rows = list(
         await session.scalars(
-            select(AARCase).where(AARCase.opened_at >= period_from)
+            select(AARCase).where(
+                AARCase.opened_at >= period_from,
+                AARCase.opened_at <= period_to,
+            )
         )
     )
     ttv: list[float] = []

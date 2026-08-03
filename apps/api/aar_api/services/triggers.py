@@ -14,8 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from aar_api.models.aar import AARCase, TriggerType
+from aar_api.models.audit import AuditAction
 from aar_api.models.dictionaries import LossReason, Operator, RepairReason, Zone
 from aar_api.models.event import Item, Outcome, UsageEvent
+from aar_api.services.audit import append as audit_append
 from aar_api.services.recommendation_validation import (
     ValidationConfig,
     auto_validate_recommendations,
@@ -202,6 +204,24 @@ async def evaluate_triggers(
             created.append(case)
 
     await session.flush()
+
+    # Case-open is a critical auditable action, but only the MANUAL path
+    # (routers/aar.create_case) recorded it — so in production, where triggers
+    # open most cases, the majority of case-opens were absent from the chain.
+    # Appended after the flush so every case already has its id.
+    for case in created:
+        await audit_append(
+            session,
+            action=AuditAction.CASE_CREATED,
+            entity_type="aar_case",
+            entity_id=case.id,
+            payload={
+                "title": case.title,
+                "trigger": case.trigger.value,
+                "operator_id": case.operator_id,
+                "auto": True,
+            },
+        )
 
     # Monitor & Validate — close the NATO LL loop.
     auto_validated, regressed = await auto_validate_recommendations(
