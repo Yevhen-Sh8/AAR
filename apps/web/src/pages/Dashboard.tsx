@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../lib/api";
 import {
-  AIInsight,
+  DerivedNote,
   HorizontalBars,
   MetricCard,
   MiniBarChart,
@@ -67,11 +67,10 @@ function now() {
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
-function fakeSparkline(base: number, n = 12): { v: number }[] {
-  return Array.from({ length: n }, (_, i) => ({
-    v: Math.max(0, base + (Math.sin(i * 0.7) * 8) + (Math.random() - 0.5) * 5),
-  }));
-}
+// REMOVED: fakeSparkline(). It generated Math.random() noise and drew it as a
+// trend line beside real MSR figures. In a defense tool a fabricated trend is
+// not decoration — a reader cannot tell it from a measurement. We show a
+// sparkline again only when we have an actual per-day series to plot.
 
 export default function Dashboard() {
   const { year, month } = now();
@@ -151,7 +150,6 @@ export default function Dashboard() {
         badge={totals ? "Стабільність" : "Завантаження..."}
         badgeType={totals && totals.msr >= 0.7 ? "green" : "red"}
         trend={totals?.delta_msr_pp}
-        sparkData={fakeSparkline(Number(msrPct))}
         stats={[
           { label: "Запущено", value: totals?.launched ?? "—" },
           { label: "Втрачено", value: totals?.lost ?? "—", color: "var(--accent-red)" },
@@ -210,13 +208,12 @@ export default function Dashboard() {
           </div>
         </div>
         {zoneBarData.length > 0 && <MiniBarChart data={zoneBarData} color="var(--accent-blue)" />}
-        <AIInsight
+        <DerivedNote
           text={
             totals && totals.msr_c > 0.85
               ? `Crew-adjusted MSR (η_c=${msrCPct}%) перевищує поріг високої готовності. Основний внесок у CLR — зона обслуги (${clrPct}%). Рекомендовано зосередити до-підготовку на ${needsTraining} експлуатантах з категорією "needs_training".`
               : "Дані завантажуються або відсутні за поточний місяць. Запустіть seed-скрипт та повторіть."
           }
-          confidence={0.84}
         />
       </div>
 
@@ -243,7 +240,6 @@ export default function Dashboard() {
               name: r.operator_code,
               msr_c: r.msr_c,
               category: r.category,
-              sparkData: fakeSparkline(r.msr_c * 100, 8),
             }))}
           />
         ) : (

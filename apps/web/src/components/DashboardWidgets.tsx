@@ -186,17 +186,24 @@ export function SignalList({ signals }: { signals: Signal[] }) {
   );
 }
 
-export function AIInsight({ text, confidence }: { text: string; confidence?: number }) {
+/**
+ * A sentence COMPUTED from the figures already on this screen.
+ *
+ * Was `AIInsight`, labelled «Кореляційний інсайт» and stamped with a hardcoded
+ * «Довіра 0.84». Both were untrue: no model produced the text (it is a
+ * template over msr_c / clr / needs_training) and no confidence was ever
+ * calculated. A fabricated certainty score standing beside real MSR numbers
+ * costs the reader's trust in every genuine figure on the page — and it
+ * contradicts our own posture that AI never asserts and humans validate
+ * (ADR-008). Real LLM output lives on the mission brief, where it carries
+ * evidence and is labelled as a draft.
+ */
+export function DerivedNote({ text }: { text: string }) {
   return (
     <div className="ai-insight">
       <div className="ai-insight-header">
-        <span>Ai</span>
-        Кореляційний інсайт
-        {confidence !== undefined && (
-          <span style={{ color: "var(--text-secondary)", fontSize: 12, marginLeft: "auto" }}>
-            Довіра {confidence.toFixed(2)}
-          </span>
-        )}
+        <span>Σ</span>
+        Розраховано з показників вище
       </div>
       <p>{text}</p>
     </div>
