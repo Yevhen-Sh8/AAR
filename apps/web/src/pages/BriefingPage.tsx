@@ -257,7 +257,7 @@ export default function BriefingPage() {
                   {d.stats.lost}
                   {d.stats.lost_during_abort > 0 && (
                     <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                      {" "}(+{d.stats.lost_during_abort} під час абортів)
+                      {" "}(+{d.stats.lost_during_abort} під час зривів)
                     </span>
                   )}
                 </div>
@@ -267,7 +267,7 @@ export default function BriefingPage() {
                 <div className="stat-value" style={{ color: "var(--accent-gold)" }}>{d.stats.repaired}</div>
               </div>
               <div className="stat-item">
-                <div className="stat-label">Аборти</div>
+                <div className="stat-label">Зриви</div>
                 <div className="stat-value">{d.stats.aborted}</div>
               </div>
             </div>

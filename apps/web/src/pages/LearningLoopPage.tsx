@@ -154,7 +154,7 @@ export default function LearningLoopPage() {
               <div className="stat-value" style={{ fontSize: 28, color: "var(--accent-gold)" }}>
                 {(d.msr_full * 100).toFixed(1)}%
               </div>
-              <div className="stat-sub">успішні ÷ (запущені + аборти)</div>
+              <div className="stat-sub">успішні ÷ (запущені + зриви)</div>
             </div>
           </div>
           <div className="stat-row" style={{ marginTop: 8 }}>
@@ -167,15 +167,15 @@ export default function LearningLoopPage() {
               <div className="stat-value">{d.launched_count}</div>
             </div>
             <div className="stat-item">
-              <div className="stat-label">Аборти</div>
+              <div className="stat-label">Зриви</div>
               <div className="stat-value" style={{ color: "var(--accent-gold)" }}>
                 {d.aborted_count}
               </div>
             </div>
           </div>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
-            Аборт = подія, що не дійшла до запуску (РЕБ-перешкоди, погода, передстартова
-            відмова техніки). Літературна норма: без абортів ~43%, з абортами ~20–30% —
+            Зрив = спроба, що не дійшла до запуску (РЕБ-перешкоди, погода, передстартова
+            відмова техніки). Літературна норма: без зривів ~43%, зі зривами ~20–30% —
             треба відстежувати обидва, інакше керівництво бачить лише оптимістичну картину.
           </p>
         </div>
