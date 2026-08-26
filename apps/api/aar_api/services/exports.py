@@ -10,6 +10,27 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from aar_api.schemas.monthly import MonthlyReport
 from aar_api.schemas.reports import DailyReport
 
+# Друкований звіт іде людині, яка не читала `docs/metrics.md`. Тому в
+# заголовках — звичайна українська назва, а наукова нотація (η, η_c, λ_c)
+# лишається у дужках і в легенді: за нею показник можна звірити з літературою
+# і з полями API (`msr`, `msr_c`, `clr`). Легенда друкується під таблицею,
+# щоб звіт був самодостатнім без інших документів.
+H_MSR = "Успішність, % (η)"
+H_MSR_C = "Успішність обслуги, % (η_c)"
+H_CLR = "Втрати обслуги, % (λ_c)"
+H_DELTA = "Зміна, в.п. (Δη)"
+
+LEGEND_MSR = "Успішність (η, MSR) = успішні ÷ запущені; аборти в знаменник не входять."
+LEGEND_MSR_C = (
+    "Успішність обслуги (η_c, MSR_c) = успішні ÷ (запущені − втрати з зовнішніх "
+    "причин − втрати через заводський дефект). Пороги: ≥ 85% висока готовність, "
+    "70–85% задовільна, < 70% потребує до-підготовки."
+)
+LEGEND_CLR = (
+    "Втрати обслуги (λ_c, CLR) = втрати й ремонти із зоною «обслуга» ÷ запущені."
+)
+LEGEND_DELTA = "Зміна (Δη) — різниця успішності з попереднім періодом, у відсоткових пунктах."
+
 
 def daily_report_to_xlsx(report: DailyReport) -> bytes:
     wb = Workbook()
@@ -23,7 +44,7 @@ def daily_report_to_xlsx(report: DailyReport) -> bytes:
     ws.append([])
     ws.append(["Т.1. Зведені показники"])
     ws.cell(row=ws.max_row, column=1).font = bold
-    headers = ["Експлуатант", "Тип", "Запущено", "Втрачено", "Ремонт", "Успіх", "η (MSR)"]
+    headers = ["Експлуатант", "Тип", "Запущено", "Втрачено", "Ремонт", "Успіх", H_MSR]
     ws.append(headers)
     for c in ws[ws.max_row]:
         c.font = bold
@@ -35,6 +56,11 @@ def daily_report_to_xlsx(report: DailyReport) -> bytes:
                t.repaired, t.success, t.msr])
     for c in ws[ws.max_row]:
         c.font = bold
+
+    ws.append([])
+    ws.append(["Позначення"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    ws.append([LEGEND_MSR])
 
     ws.append([])
     ws.append(["Т.2. Безповоротні втрати — деталізація"])
@@ -105,7 +131,7 @@ def daily_report_to_pdf(report: DailyReport) -> bytes:
         Paragraph("Т.1. Зведені показники", styles["Heading2"]),
     ]
     summary: list[list[object]] = [
-        ["Експлуатант", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх", "η (MSR)"]
+        ["Експлуатант", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх", H_MSR]
     ]
     for r in report.rows:
         summary.append(
@@ -118,6 +144,8 @@ def daily_report_to_pdf(report: DailyReport) -> bytes:
          t.repaired, t.success, f"{t.msr:.2%}"]
     )
     story.append(_table(summary))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(LEGEND_MSR, styles["BodyText"]))
 
     def _break_table(title: str, items: list) -> None:
         if not items:
@@ -150,7 +178,7 @@ def monthly_report_to_xlsx(report: MonthlyReport) -> bytes:
     ws.cell(row=ws.max_row, column=1).font = bold
     ws.append([
         "Експлуатант", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх",
-        "η (MSR)", "η_c (MSR_c)", "λ_c (CLR)", "Δη (в.п.)",
+        H_MSR, H_MSR_C, H_CLR, H_DELTA,
     ])
     for c in ws[ws.max_row]:
         c.font = bold
@@ -168,9 +196,9 @@ def monthly_report_to_xlsx(report: MonthlyReport) -> bytes:
         c.font = bold
 
     ws.append([])
-    ws.append(["Рейтинг експлуатантів за η_c"])
+    ws.append(["Рейтинг експлуатантів за успішністю обслуги (η_c)"])
     ws.cell(row=ws.max_row, column=1).font = bold
-    ws.append(["Місце", "Експлуатант", "η_c (MSR_c)", "Категорія"])
+    ws.append(["Місце", "Експлуатант", H_MSR_C, "Категорія"])
     for c in ws[ws.max_row]:
         c.font = bold
     for rt in report.rating:
@@ -188,7 +216,7 @@ def monthly_report_to_xlsx(report: MonthlyReport) -> bytes:
     ws.append([])
     ws.append(["Т.6. Динаміка vs попередній місяць"])
     ws.cell(row=ws.max_row, column=1).font = bold
-    ws.append(["Експлуатант", "η попер.", "η поточ.", "Тренд"])
+    ws.append(["Експлуатант", "Успішність попер.", "Успішність поточ.", "Тренд"])
     for c in ws[ws.max_row]:
         c.font = bold
     for tr in report.trends:
@@ -197,6 +225,12 @@ def monthly_report_to_xlsx(report: MonthlyReport) -> bytes:
             tr.msr_prev if tr.msr_prev is not None else "-",
             tr.msr_this, tr.trend,
         ])
+
+    ws.append([])
+    ws.append(["Позначення"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+    for line in (LEGEND_MSR, LEGEND_MSR_C, LEGEND_CLR, LEGEND_DELTA):
+        ws.append([line])
 
     buf = BytesIO()
     wb.save(buf)
@@ -214,7 +248,7 @@ def monthly_report_to_pdf(report: MonthlyReport) -> bytes:
     ]
     integral: list[list[object]] = [[
         "Експл.", "Тип", "Запущ.", "Втрач.", "Ремонт", "Успіх",
-        "η (MSR)", "η_c (MSR_c)", "λ_c (CLR)", "Δη",
+        "Успішн., %", "Обслуга, %", "Втрати обсл., %", "Зміна, в.п.",
     ]]
     for r in report.rows:
         integral.append([
@@ -229,9 +263,14 @@ def monthly_report_to_pdf(report: MonthlyReport) -> bytes:
         f"{t.clr:.2%}", f"{t.delta_msr_pp:+.1f}",
     ])
     story.append(_table(integral))
+    story.append(Spacer(1, 6))
+    story.extend(
+        Paragraph(line, styles["BodyText"])
+        for line in (LEGEND_MSR, LEGEND_MSR_C, LEGEND_CLR, LEGEND_DELTA)
+    )
 
     story.extend([Spacer(1, 12), Paragraph("Рейтинг експлуатантів", styles["Heading2"])])
-    rating: list[list[object]] = [["Місце", "Експлуатант", "η_c (MSR_c)", "Категорія"]]
+    rating: list[list[object]] = [["Місце", "Експлуатант", "Успішність обслуги, %", "Категорія"]]
     rating.extend([r.rank, r.operator_code, f"{r.msr_c:.2%}", r.category]
                   for r in report.rating)
     story.append(_table(rating))

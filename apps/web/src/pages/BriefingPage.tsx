@@ -10,6 +10,7 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
+import { METRIC } from "../lib/metrics";
 import { apiFetch, IS_DEMO } from "../lib/api";
 
 interface ProfileStats {
@@ -243,7 +244,7 @@ export default function BriefingPage() {
             </div>
             <div className="stat-row" style={{ marginTop: 0, paddingTop: 0, borderTop: 0 }}>
               <div className="stat-item">
-                <div className="stat-label">η (MSR)</div>
+                <div className="stat-label" title={METRIC.msr.hint}>{METRIC.msr.label}</div>
                 <div className="stat-value" style={{ color: "var(--accent-green)" }}>{msrPct}%</div>
               </div>
               <div className="stat-item">

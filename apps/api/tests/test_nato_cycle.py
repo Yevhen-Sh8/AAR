@@ -178,5 +178,5 @@ async def test_daily_report_has_conclusions_block() -> None:
         c = body["conclusions"]
         assert c is not None
         assert any("c (×2)" in s for s in c["top_loss_reasons"])
-        assert "η =" in c["headline"]
+        assert "Успішність" in c["headline"]
         assert "запущено 3" in c["headline"]

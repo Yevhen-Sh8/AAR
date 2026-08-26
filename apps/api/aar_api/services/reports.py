@@ -186,7 +186,7 @@ async def _build_conclusions(
     )
 
     headline = (
-        f"η = {totals.msr * 100:.1f}%, запущено {totals.launched}, "
+        f"Успішність {totals.msr * 100:.1f}%, запущено {totals.launched}, "
         f"успіх {totals.success}, втрат {totals.lost}, ремонт {totals.repaired}."
     )
     if not triggers and totals.lost == 0:

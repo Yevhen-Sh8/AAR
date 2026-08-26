@@ -1,4 +1,5 @@
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { METRIC } from "../lib/metrics";
 import {
   AreaChart,
   Area,
@@ -12,6 +13,8 @@ import {
 
 interface MetricCardProps {
   title: string;
+  /** Розшифровка показника — спливає при наведенні на заголовок. */
+  titleHint?: string;
   value: number | string;
   unit?: string;
   badge?: string;
@@ -22,12 +25,12 @@ interface MetricCardProps {
 }
 
 export function MetricCard({
-  title, value, unit, badge, badgeType = "green", trend, sparkData, stats,
+  title, titleHint, value, unit, badge, badgeType = "green", trend, sparkData, stats,
 }: MetricCardProps) {
   return (
     <div className="card">
       <div className="card-header">
-        <span className="card-title">{title}</span>
+        <span className="card-title" title={titleHint}>{title}</span>
         {badge && <span className={`card-badge badge-${badgeType}`}>{badge}</span>}
       </div>
       <div className="big-number-row">
@@ -124,7 +127,7 @@ export function RatingTable({ rows }: { rows: RatingRow[] }) {
           <th>#</th>
           <th>Експлуатант</th>
           <th>Spark</th>
-          <th>η_c</th>
+          <th title={METRIC.msrC.hint}>{METRIC.msrC.short}</th>
           <th>Статус</th>
         </tr>
       </thead>

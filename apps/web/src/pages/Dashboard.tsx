@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../lib/api";
+import { METRIC, RATING_THRESHOLD_HINT } from "../lib/metrics";
 import {
   DerivedNote,
   HorizontalBars,
@@ -144,7 +145,8 @@ export default function Dashboard() {
     <div className="dashboard-grid">
       {/* Row 1: Main KPI + Risk signals */}
       <MetricCard
-        title="MSR підприємства (η)"
+        title={`${METRIC.msr.label} — усе підприємство`}
+        titleHint={METRIC.msr.hint}
         value={msrPct}
         unit="зі 100"
         badge={totals ? "Стабільність" : "Завантаження..."}
@@ -180,7 +182,7 @@ export default function Dashboard() {
         badge={needsTraining === 0 ? "В межах норми" : `${needsTraining} до підг.`}
         badgeType={needsTraining === 0 ? "green" : "red"}
         stats={[
-          { label: "Високий η_c", value: highCount, color: "var(--accent-green)" },
+          { label: "Висока готовність", value: highCount, color: "var(--accent-green)" },
           { label: "До підготовки", value: needsTraining, color: "var(--accent-red)" },
           { label: "Загалом у рейтингу", value: rating.length },
         ]}
@@ -188,20 +190,24 @@ export default function Dashboard() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Метрики (η_c / λ_c)</span>
+          <span className="card-title">Обслуга: успішність і втрати</span>
           <span className="card-badge badge-blue">
             {year}-{String(month).padStart(2, "0")}
           </span>
         </div>
         <div style={{ display: "flex", gap: 24, marginBottom: 12 }}>
           <div>
-            <div className="stat-label">η_c (MSR_c)</div>
+            <div className="stat-label" title={METRIC.msrC.hint}>
+              {METRIC.msrC.label}
+            </div>
             <div className="stat-value" style={{ fontSize: 28, color: "var(--accent-green)" }}>
               {msrCPct}%
             </div>
           </div>
           <div>
-            <div className="stat-label">λ_c (CLR)</div>
+            <div className="stat-label" title={METRIC.clr.hint}>
+              {METRIC.clr.label}
+            </div>
             <div className="stat-value" style={{ fontSize: 28, color: "var(--accent-red)" }}>
               {clrPct}%
             </div>
@@ -211,7 +217,7 @@ export default function Dashboard() {
         <DerivedNote
           text={
             totals && totals.msr_c > 0.85
-              ? `Crew-adjusted MSR (η_c=${msrCPct}%) перевищує поріг високої готовності. Основний внесок у CLR — зона обслуги (${clrPct}%). Рекомендовано зосередити до-підготовку на ${needsTraining} експлуатантах з категорією "needs_training".`
+              ? `Успішність у зоні обслуги — ${msrCPct}%: вище порога високої готовності (85%). Втрати з вини обслуги — ${clrPct}% від запущених. Рекомендовано зосередити до-підготовку на ${needsTraining} експлуатантах із категорією «потребує до-підготовки».`
               : "Дані завантажуються або відсутні за поточний місяць. Запустіть seed-скрипт та повторіть."
           }
         />
@@ -231,7 +237,9 @@ export default function Dashboard() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Рейтинг експлуатантів за η_c</span>
+          <span className="card-title" title={RATING_THRESHOLD_HINT}>
+            Рейтинг експлуатантів за успішністю обслуги
+          </span>
         </div>
         {rating.length > 0 ? (
           <RatingTable

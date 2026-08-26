@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileBarChart, Download, Calendar } from "lucide-react";
 import { API_BASE, apiFetch, IS_DEMO } from "../lib/api";
+import { METRIC, RATING_THRESHOLD_HINT } from "../lib/metrics";
 
 interface DailyRow {
   operator_code: string;
@@ -161,13 +162,13 @@ export default function ReportsPage() {
                   </div>
                 </div>
                 <div className="stat-item">
-                  <div className="stat-label">η (MSR)</div>
+                  <div className="stat-label" title={METRIC.msr.hint}>{METRIC.msr.label}</div>
                   <div className="stat-value">
                     {(monthly.data.totals.msr * 100).toFixed(1)}%
                   </div>
                 </div>
                 <div className="stat-item">
-                  <div className="stat-label">η_c (MSR_c)</div>
+                  <div className="stat-label" title={METRIC.msrC.hint}>{METRIC.msrC.label}</div>
                   <div className="stat-value" style={{ color: "var(--accent-green)" }}>
                     {(monthly.data.totals.msr_c * 100).toFixed(1)}%
                   </div>
@@ -186,9 +187,9 @@ export default function ReportsPage() {
                     <th>Успішно</th>
                     <th>Втрачено</th>
                     <th>Ремонт</th>
-                    <th>η</th>
-                    <th>η_c</th>
-                    <th>λ_c</th>
+                    <th title={METRIC.msr.hint}>{METRIC.msr.short}</th>
+                    <th title={METRIC.msrC.hint}>{METRIC.msrC.short}</th>
+                    <th title={METRIC.clr.hint}>{METRIC.clr.short}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -209,15 +210,15 @@ export default function ReportsPage() {
               </table>
 
               <h3 style={{ margin: "20px 0 12px", fontSize: 14, color: "var(--text-secondary)" }}>
-                Рейтинг експлуатантів за η_c
+                Рейтинг експлуатантів за успішністю обслуги
               </h3>
               <table className="data-table">
                 <thead>
                   <tr>
                     <th>Ранг</th>
                     <th>Експлуатант</th>
-                    <th>η_c</th>
-                    <th>Категорія</th>
+                    <th title={METRIC.msrC.hint}>{METRIC.msrC.short}</th>
+                    <th title={RATING_THRESHOLD_HINT}>Категорія</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -304,7 +305,7 @@ export default function ReportsPage() {
                   </div>
                 </div>
                 <div className="stat-item">
-                  <div className="stat-label">η (MSR)</div>
+                  <div className="stat-label" title={METRIC.msr.hint}>{METRIC.msr.label}</div>
                   <div className="stat-value">
                     {(daily.data.totals.msr * 100).toFixed(1)}%
                   </div>

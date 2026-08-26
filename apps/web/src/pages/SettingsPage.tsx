@@ -7,7 +7,7 @@ const APP_VERSION = "1.8.0";
 
 const FEATURES = [
   { key: "Two-level data model", state: "available", note: "Events → AAR Cases" },
-  { key: "Daily / monthly reports (η, η_c, λ_c)", state: "available", note: "XLSX + PDF" },
+  { key: "Daily / monthly reports (MSR, MSR_c, CLR)", state: "available", note: "XLSX + PDF" },
   { key: "AAR triggers T1–T5", state: "available", note: "msr_drop, repeated_reason, item_anomaly, enterprise_drop, manual" },
   { key: "Audit hash-chain (SHA-256)", state: "available", note: "append-only, /audit/verify" },
   { key: "CSV/XLSX bulk import", state: "available", note: "POST /events/import" },

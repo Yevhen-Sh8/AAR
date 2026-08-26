@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Clock, TrendingUp, AlertTriangle, DollarSign, Users } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { METRIC } from "../lib/metrics";
 
 interface LoopKPI {
   time_to_validation_days_median: number | null;
@@ -131,25 +132,29 @@ export default function LearningLoopPage() {
       <div className="dashboard-grid">
         <div className="card">
           <div className="card-header">
-            <span className="card-title">MSR — обидва знаменники</span>
+            <span className="card-title">Успішність за двома знаменниками</span>
             <span className="card-badge badge-blue">
               {d.launched_count + d.aborted_count} спроб
             </span>
           </div>
           <div style={{ display: "flex", gap: 24, marginBottom: 12 }}>
             <div>
-              <div className="stat-label">η_narrow (без абортів)</div>
+              <div className="stat-label" title={METRIC.msrNarrow.hint}>
+                {METRIC.msrNarrow.label}
+              </div>
               <div className="stat-value" style={{ fontSize: 28, color: "var(--accent-green)" }}>
                 {(d.msr_narrow * 100).toFixed(1)}%
               </div>
-              <div className="stat-sub">success / launched</div>
+              <div className="stat-sub">успішні ÷ запущені</div>
             </div>
             <div>
-              <div className="stat-label">η_full (з абортами)</div>
+              <div className="stat-label" title={METRIC.msrFull.hint}>
+                {METRIC.msrFull.label}
+              </div>
               <div className="stat-value" style={{ fontSize: 28, color: "var(--accent-gold)" }}>
                 {(d.msr_full * 100).toFixed(1)}%
               </div>
-              <div className="stat-sub">success / (launched + aborted)</div>
+              <div className="stat-sub">успішні ÷ (запущені + аборти)</div>
             </div>
           </div>
           <div className="stat-row" style={{ marginTop: 8 }}>
@@ -170,8 +175,8 @@ export default function LearningLoopPage() {
           </div>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
             Аборт = подія, що не дійшла до запуску (РЕБ-перешкоди, погода, передстартова
-            відмова техніки). Літературна норма: η_narrow ~43%, η_full ~20–30% — треба
-            відстежувати обидва, інакше керівництво бачить лише оптимістичну картину.
+            відмова техніки). Літературна норма: без абортів ~43%, з абортами ~20–30% —
+            треба відстежувати обидва, інакше керівництво бачить лише оптимістичну картину.
           </p>
         </div>
 
