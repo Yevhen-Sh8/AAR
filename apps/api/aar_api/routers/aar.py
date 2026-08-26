@@ -241,6 +241,39 @@ async def close_case(case_id: int, session: AsyncSession = Depends(get_session))
     return case
 
 
+def _speaking_for_another(claims: dict | None, subject_id: int | None) -> int | None:
+    """Authorise writing testimony under someone else's name; return the typist.
+
+    Testimony here is ATTRIBUTED. The audit chain names an originator, and
+    `/aar/my-observations` later shows that person «ось що вийшло з вашого
+    звіту». So putting words into a colleague's record is not a neutral act:
+    it forges an evidentiary entry in an append-only chain and hands the
+    consequences to someone who never said them.
+
+    Transcription on behalf of another IS a real workflow and stays allowed —
+    roster people deliberately have no account (`docs/QUICKSTART_ROLES.md`
+    §5.1), so a manager types up their paper report. It is simply privileged,
+    and the chain records WHO typed it separately from WHOSE testimony it is.
+
+    Returns the caller's uid when they are speaking for someone else (stored
+    as `transcribed_by`), or None when speaking for themselves or when the
+    caller cannot be identified.
+
+    `claims is None` means no token, which in production cannot happen on this
+    route — the global auth gate runs first. In development/tests the gate is
+    off and there is no caller to check, so the rule cannot apply.
+    """
+    caller_uid = (claims or {}).get("uid")
+    if not isinstance(caller_uid, int) or subject_id is None or caller_uid == subject_id:
+        return None
+    if not has_role(claims, Role.ADMIN, Role.MANAGER, Role.ANALYST):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="цей запит адресований іншій особі — подати звіт за неї не можна",
+        )
+    return caller_uid
+
+
 @router.post(
     "/cases/{case_id}/reports", response_model=IndividualReportOut, status_code=201
 )
@@ -284,6 +317,11 @@ async def add_report(
         if payload.user_id is not None and payload.user_id != stub.requested_for_user_id:
             raise HTTPException(409, "user_id не відповідає адресату запиту")
         originator = payload.user_id or stub.requested_for_user_id
+        # ...and the check above only ever fired when the caller volunteered a
+        # `user_id`, which the participant UI never sends. Any logged-in
+        # participant could POST {request_id} at a colleague's stub and have
+        # the chain record the colleague as the author. Gate on the CALLER.
+        transcribed_by = _speaking_for_another(claims, stub.requested_for_user_id)
         snapshot_function = stub.function
         for k, v in data.items():
             if k == "function" and v is None:
@@ -292,8 +330,9 @@ async def add_report(
         if payload.function is not None:
             snapshot_function = payload.function
         stub.submitted_at = now
-        if payload.anonymous:
-            stub.user_id = None
+        # `user_id` is «who submitted». Leaving it null on a NON-anonymous
+        # report made every stub submission look anonymous at the row level.
+        stub.user_id = None if payload.anonymous else originator
         await session.flush()
         await _audit_report_submitted(
             session,
@@ -303,11 +342,15 @@ async def add_report(
             anonymous=payload.anonymous,
             originator_user_id=originator,
             function=snapshot_function,
+            transcribed_by=transcribed_by,
         )
         await session.commit()
         await session.refresh(stub)
         return redaction.report_out(stub, reveal=has_role(claims, Role.ADMIN))
 
+    # Same hole without a stub: POST {user_id: <colleague>} attributed a
+    # freshly-created report to them just as effectively.
+    transcribed_by = _speaking_for_another(claims, payload.user_id)
     report = IndividualReport(case_id=case_id, submitted_at=now, **data)
     if payload.anonymous:
         report.user_id = None
@@ -321,6 +364,7 @@ async def add_report(
         anonymous=payload.anonymous,
         originator_user_id=payload.user_id,
         function=payload.function,
+        transcribed_by=transcribed_by,
     )
     await session.commit()
     await session.refresh(report)
@@ -336,6 +380,7 @@ async def _audit_report_submitted(
     anonymous: bool,
     originator_user_id: int | None,
     function: ParticipantFunction | None,
+    transcribed_by: int | None = None,
 ) -> None:
     """BUG-2 fix: creating/filling a report is state-changing — record it.
 
@@ -358,6 +403,10 @@ async def _audit_report_submitted(
             "request_id": request_id,
             "anonymous": anonymous,
             "originator_user_id": originator_user_id,
+            # Set only when someone typed this up on the originator's behalf.
+            # Whose testimony it is and who entered it are different facts, and
+            # the chain must not conflate them.
+            "transcribed_by": transcribed_by,
             "function": function.value if function else None,
             "off_roster": row.off_roster,
         },
