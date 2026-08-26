@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
-import { Wifi, WifiOff, RefreshCw } from "lucide-react";
-import { allEvents, type QueuedEvent } from "../lib/db";
-import { flushQueue, submitEvent } from "../lib/sync";
+import { Wifi, WifiOff, RefreshCw, RotateCcw, AlertTriangle } from "lucide-react";
+import { allEvents, requeueEntry, type QueuedEvent } from "../lib/db";
+import { flushQueue, retryFailed, submitEvent } from "../lib/sync";
+
+const STATUS_LABELS: Record<QueuedEvent["status"], string> = {
+  pending: "у черзі",
+  syncing: "надсилається",
+  synced: "на сервері",
+  failed: "відхилено",
+};
 
 export default function EventForm() {
   const [serial, setSerial] = useState("");
@@ -56,8 +63,24 @@ export default function EventForm() {
     setBusy(false);
   }
 
+  async function onRetryFailed() {
+    setBusy(true);
+    await retryFailed();
+    await refresh();
+    setBusy(false);
+  }
+
+  async function onRetryOne(id: string) {
+    setBusy(true);
+    await requeueEntry(id);
+    await flushQueue();
+    await refresh();
+    setBusy(false);
+  }
+
   const pending = queue.filter((q) => q.status === "pending").length;
   const synced = queue.filter((q) => q.status === "synced").length;
+  const failed = queue.filter((q) => q.status === "failed").length;
 
   return (
     <div className="dashboard-grid">
@@ -111,22 +134,58 @@ export default function EventForm() {
       <div className="card">
         <div className="card-header">
           <span className="card-title">Локальна черга</span>
-          <span className="card-badge badge-gold">{pending} pending</span>
+          <span className={`card-badge ${failed > 0 ? "badge-red" : "badge-gold"}`}>
+            {failed > 0 ? `${failed} відхилено` : `${pending} у черзі`}
+          </span>
         </div>
         <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
           <div className="stat-item">
-            <div className="stat-label">Pending</div>
+            <div className="stat-label" title="Ще не на сервері. Повторюється автоматично.">
+              У черзі
+            </div>
             <div className="stat-value" style={{ color: "var(--accent-gold)" }}>{pending}</div>
           </div>
           <div className="stat-item">
-            <div className="stat-label">Synced</div>
+            <div className="stat-label">На сервері</div>
             <div className="stat-value" style={{ color: "var(--accent-green)" }}>{synced}</div>
           </div>
           <div className="stat-item">
-            <div className="stat-label">Total</div>
+            <div
+              className="stat-label"
+              title="Сервер відмовився прийняти ці події. Автоматично вони не підуть — треба виправити причину."
+            >
+              Відхилено
+            </div>
+            <div
+              className="stat-value"
+              style={{ color: failed > 0 ? "var(--accent-red)" : undefined }}
+            >
+              {failed}
+            </div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-label">Усього</div>
             <div className="stat-value">{queue.length}</div>
           </div>
         </div>
+
+        {/* The state that used to be invisible. A rejected event is data the
+            operator believes was recorded — say so, out loud. */}
+        {failed > 0 && (
+          <div
+            className="error-msg"
+            style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}
+          >
+            <AlertTriangle size={14} />
+            <span style={{ flex: 1 }}>
+              {failed} {failed === 1 ? "подію" : "подій"} сервер не прийняв. Вони НЕ
+              на сервері й автоматично не повторюються — подивіться причину нижче.
+            </span>
+            <button className="secondary" onClick={onRetryFailed} disabled={busy}>
+              <RotateCcw size={14} /> Повторити всі
+            </button>
+          </div>
+        )}
         <button className="secondary" onClick={onSync} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <RefreshCw size={14} /> Синхронізувати зараз
         </button>
@@ -146,10 +205,21 @@ export default function EventForm() {
               <span className={`card-badge ${
                 q.status === "synced" ? "badge-green" : q.status === "pending" ? "badge-gold" : "badge-red"
               }`}>
-                {q.status}
+                {STATUS_LABELS[q.status]}
               </span>
               {q.server_id !== null && ` · #${q.server_id}`}
+              {q.attempts > 1 && ` · спроб: ${q.attempts}`}
               {q.last_error && <span style={{ color: "var(--accent-red)" }}> · {q.last_error}</span>}
+              {q.status === "failed" && (
+                <button
+                  className="secondary"
+                  style={{ marginLeft: 8, padding: "1px 8px", fontSize: 11 }}
+                  onClick={() => void onRetryOne(q.client_event_id)}
+                  disabled={busy}
+                >
+                  Повторити
+                </button>
+              )}
             </div>
           ))}
         </div>
