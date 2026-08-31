@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FileBarChart, Download, Calendar } from "lucide-react";
-import { API_BASE, apiFetch, IS_DEMO } from "../lib/api";
+import { apiFetch, IS_DEMO } from "../lib/api";
+import { downloadFile } from "../lib/download";
 import { METRIC, RATING_THRESHOLD_HINT } from "../lib/metrics";
 
 interface DailyRow {
@@ -48,13 +49,6 @@ function currentMonth(): { y: number; m: number } {
   return { y: d.getFullYear(), m: d.getMonth() + 1 };
 }
 
-function downloadUrl(path: string): string {
-  // Must follow the SAME resolution as apiFetch: in production the frontend
-  // is a static site on a different origin than the API (VITE_API_BASE is an
-  // absolute URL), so a literal "/api" would hit the CDN and 404.
-  const base = IS_DEMO ? import.meta.env.BASE_URL + "mock" : API_BASE;
-  return `${base}${path}`;
-}
 
 export default function ReportsPage() {
   const [tab, setTab] = useState<"daily" | "monthly">("monthly");
@@ -76,6 +70,34 @@ export default function ReportsPage() {
   });
 
   const ym = `${year}-${String(month).padStart(2, "0")}`;
+
+  // A link cannot carry a bearer token, so downloads go through fetch and a
+  // blob. Failures are shown here rather than swallowed — a report that did
+  // not download must not look like one that did.
+  const [dlBusy, setDlBusy] = useState<string | null>(null);
+  const [dlError, setDlError] = useState<string | null>(null);
+
+  async function grab(path: string, filename: string) {
+    setDlBusy(filename);
+    setDlError(null);
+    const res = await downloadFile(path, filename);
+    if (!res.ok) setDlError(res.error);
+    setDlBusy(null);
+  }
+
+  function DownloadButton({ path, filename, label }: {
+    path: string; filename: string; label: string;
+  }) {
+    return (
+      <button
+        className="btn-link"
+        onClick={() => void grab(path, filename)}
+        disabled={dlBusy !== null}
+      >
+        <Download size={14} /> {dlBusy === filename ? "…" : label}
+      </button>
+    );
+  }
 
   return (
     <div className="page-stack">
@@ -120,24 +142,19 @@ export default function ReportsPage() {
                   <option key={mo} value={mo}>{String(mo).padStart(2, "0")}</option>
                 ))}
               </select>
-              <a
-                className="btn-link"
-                href={downloadUrl(`/reports/monthly.xlsx?year=${year}&month=${month}`)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Download size={14} /> XLSX
-              </a>
-              <a
-                className="btn-link"
-                href={downloadUrl(`/reports/monthly.pdf?year=${year}&month=${month}`)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Download size={14} /> PDF
-              </a>
+              <DownloadButton
+                path={`/reports/monthly.xlsx?year=${year}&month=${month}`}
+                filename={`aar-monthly-${ym}.xlsx`}
+                label="XLSX"
+              />
+              <DownloadButton
+                path={`/reports/monthly.pdf?year=${year}&month=${month}`}
+                filename={`aar-monthly-${ym}.pdf`}
+                label="PDF"
+              />
             </div>
           </div>
+          {dlError && <div className="error-msg">{dlError}</div>}
 
           {monthly.isLoading && <div className="loading">Завантаження…</div>}
           {monthly.isError && <div className="error-msg">Помилка завантаження</div>}
@@ -257,24 +274,19 @@ export default function ReportsPage() {
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
-              <a
-                className="btn-link"
-                href={downloadUrl(`/reports/daily.xlsx?date=${date}`)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Download size={14} /> XLSX
-              </a>
-              <a
-                className="btn-link"
-                href={downloadUrl(`/reports/daily.pdf?date=${date}`)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Download size={14} /> PDF
-              </a>
+              <DownloadButton
+                path={`/reports/daily.xlsx?date=${date}`}
+                filename={`aar-daily-${date}.xlsx`}
+                label="XLSX"
+              />
+              <DownloadButton
+                path={`/reports/daily.pdf?date=${date}`}
+                filename={`aar-daily-${date}.pdf`}
+                label="PDF"
+              />
             </div>
           </div>
+          {dlError && <div className="error-msg">{dlError}</div>}
 
           {daily.isLoading && <div className="loading">Завантаження…</div>}
           {daily.isError && <div className="error-msg">Помилка завантаження</div>}
@@ -347,7 +359,8 @@ export default function ReportsPage() {
       {IS_DEMO && (
         <div className="card" style={{ background: "var(--accent-gold-muted)" }}>
           <p style={{ color: "var(--accent-gold)", fontSize: 13 }}>
-            ⓘ Demo-режим: XLSX/PDF посилання поверне 404 (мок-файлів немає). У dev/prod працює нормально.
+            ⓘ Demo-режим: вивантаження XLSX/PDF недоступне — бекенду, який
+            формує файли, тут немає. У робочому контурі працює.
           </p>
         </div>
       )}
