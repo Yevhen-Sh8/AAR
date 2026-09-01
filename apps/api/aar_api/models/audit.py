@@ -27,6 +27,7 @@ class AuditAction(StrEnum):
     RECOMMENDATION_UPDATED = "recommendation.updated"
     RECOMMENDATION_AUTO_VALIDATED = "recommendation.auto_validated"
     RECOMMENDATION_REGRESSED = "recommendation.regressed"
+    RECOMMENDATION_ESCALATED = "recommendation.escalated"
     SUBSCRIPTION_CREATED = "subscription.created"
     SUBSCRIPTION_DELETED = "subscription.deleted"
     TRIGGERS_RUN = "triggers.run"

@@ -104,7 +104,7 @@ async def test_auto_validation_after_quiet_window() -> None:
         rec_id = rec.id
 
     async with Session() as s:
-        auto_v, regressed = await auto_validate_recommendations(
+        auto_v, regressed, _escalated = await auto_validate_recommendations(
             s, TODAY, recurring_signatures=set(), cfg=ValidationConfig()
         )
         await s.commit()
@@ -133,7 +133,7 @@ async def test_auto_regression_on_recurrence() -> None:
         rec_id = rec.id
 
     async with Session() as s:
-        auto_v, regressed = await auto_validate_recommendations(
+        auto_v, regressed, _escalated = await auto_validate_recommendations(
             s, TODAY,
             recurring_signatures={f"T2:loss:c:{TODAY.isoformat()}"},
             cfg=ValidationConfig(),

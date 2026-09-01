@@ -37,8 +37,24 @@ interface MonthlyReport {
   month: number;
   rows: MonthlyRow[];
   totals: MonthlyRow;
-  rating: { operator_code: string; msr_c: number; category: string; rank: number }[];
+  rating: {
+    operator_code: string;
+    msr_c: number;
+    category: string;
+    rank: number;
+    sorties: number;
+    cleaned_denominator: number;
+    sample_sufficient: boolean;
+  }[];
 }
+
+/** Readiness bucket in Ukrainian — the raw enum was rendered verbatim before. */
+const CATEGORY_UK: Record<string, string> = {
+  high: "висока готовність",
+  ok: "задовільна",
+  needs_training: "потребує до-підготовки",
+  insufficient_data: "замало даних для висновку",
+};
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -235,6 +251,7 @@ export default function ReportsPage() {
                     <th>Ранг</th>
                     <th>Експлуатант</th>
                     <th title={METRIC.msrC.hint}>{METRIC.msrC.short}</th>
+                    <th title="Кількість запусків, на яких побудовано число.">Запусків</th>
                     <th title={RATING_THRESHOLD_HINT}>Категорія</th>
                   </tr>
                 </thead>
@@ -248,8 +265,17 @@ export default function ReportsPage() {
                       </td>
                       <td className="mono">{r.operator_code}</td>
                       <td>{(r.msr_c * 100).toFixed(1)}%</td>
+                      <td
+                        style={{
+                          color: r.sample_sufficient ? undefined : "var(--accent-gold)",
+                        }}
+                      >
+                        {r.sorties}
+                      </td>
                       <td>
-                        <span className={`chip chip-${r.category}`}>{r.category}</span>
+                        <span className={`chip chip-${r.category}`}>
+                          {CATEGORY_UK[r.category] ?? r.category}
+                        </span>
                       </td>
                     </tr>
                   ))}

@@ -19,8 +19,14 @@ class OperatorMonth(BaseModel):
 class OperatorRating(BaseModel):
     operator_code: str
     msr_c: float
-    category: str         # "high" | "ok" | "needs_training"
+    category: str         # "high" | "ok" | "needs_training" | "insufficient_data"
     rank: int
+    #: Launches the rating is built on — the completeness indicator (ADR-027).
+    sorties: int = 0
+    #: Denominator of η_c after removing external and manufacturer losses.
+    cleaned_denominator: int = 0
+    #: False → `category` is "insufficient_data" and carries no verdict.
+    sample_sufficient: bool = True
 
 
 class ReasonZoneSummary(BaseModel):

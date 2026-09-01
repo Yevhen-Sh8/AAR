@@ -116,8 +116,29 @@ interface RatingRow {
   name: string;
   msr_c: number;
   category: string;
+  /** Launches behind the number — ADR-027. */
+  sorties?: number;
+  sample_sufficient?: boolean;
   sparkData?: { v: number }[];
 }
+
+/** Readiness bucket, including the honest refusal to issue one. */
+const CATEGORY: Record<string, { label: string; badge: string; hint: string }> = {
+  high: { label: "Високий", badge: "green", hint: "Успішність обслуги ≥ 85%." },
+  ok: { label: "Стабільно", badge: "gold", hint: "Успішність обслуги 70–85%." },
+  needs_training: {
+    label: "До підг.",
+    badge: "red",
+    hint: "Успішність обслуги < 70%.",
+  },
+  insufficient_data: {
+    label: "Мало даних",
+    badge: "blue",
+    hint:
+      "Замало запусків, щоб робити висновок про готовність. Число показано, " +
+      "вердикт — ні: на кількох вильотах будь-який відсоток нічого не доводить.",
+  },
+};
 
 export function RatingTable({ rows }: { rows: RatingRow[] }) {
   return (
@@ -150,12 +171,23 @@ export function RatingTable({ rows }: { rows: RatingRow[] }) {
                 </ResponsiveContainer>
               )}
             </td>
-            <td style={{ fontWeight: 700 }}>{(r.msr_c * 100).toFixed(0)}</td>
+            <td style={{ fontWeight: 700 }}>
+              {(r.msr_c * 100).toFixed(0)}
+              {r.sorties !== undefined && (
+                <span
+                  style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}
+                  title="Кількість запусків, на яких побудовано число."
+                >
+                  {" "}/ {r.sorties}
+                </span>
+              )}
+            </td>
             <td>
-              <span className={`card-badge badge-${
-                r.category === "high" ? "green" : r.category === "ok" ? "gold" : "red"
-              }`}>
-                {r.category === "high" ? "Високий" : r.category === "ok" ? "Стабільно" : "До підг."}
+              <span
+                className={`card-badge badge-${(CATEGORY[r.category] ?? CATEGORY.needs_training).badge}`}
+                title={(CATEGORY[r.category] ?? CATEGORY.needs_training).hint}
+              >
+                {(CATEGORY[r.category] ?? CATEGORY.needs_training).label}
               </span>
             </td>
           </tr>

@@ -9,6 +9,12 @@ recurrence of the signature pattern over a validation window:
   - recurrence     → regressed_at set, status → IN_PROGRESS
                      (and evidence_count += 1)
 
+A recommendation that keeps regressing is NOT a slow success. Past
+`ValidationConfig.max_regressions` the loop stops treating it as routine and
+escalates it to a person: a fix that has failed three times is usually the
+wrong diagnosis, not an under-applied remedy, and silently cycling it forever
+buries that fact in a counter nobody reads (ADR-027).
+
 `signature` is the same string family used by the trigger engine
 (e.g. "T2:loss:c" or "T1:Е-07"), so we can ask: "did the same problem fire
 again?"
@@ -36,6 +42,9 @@ class ValidationConfig:
     auto-validated. Default 14 days aligns with T2's 7-day window × 2."""
 
     quiet_window_days: int = 14
+    #: Regressions after which the recommendation is escalated instead of
+    #: being cycled again. Two is a setback; three is a wrong diagnosis.
+    max_regressions: int = 3
 
 
 async def auto_validate_recommendations(
@@ -43,7 +52,7 @@ async def auto_validate_recommendations(
     today: date,
     recurring_signatures: set[str],
     cfg: ValidationConfig | None = None,
-) -> tuple[list[int], list[int]]:
+) -> tuple[list[int], list[int], list[int]]:
     """Walk DONE recommendations and decide auto-validate or regress.
 
     Args:
@@ -51,7 +60,11 @@ async def auto_validate_recommendations(
             E.g. {"T2:loss:c:2026-06-10", "T1:Е-07:2026-06-10"}.
             The date suffix is stripped before comparison.
 
-    Returns: (auto_validated_ids, regressed_ids)
+    Returns: (auto_validated_ids, regressed_ids, escalated_ids)
+
+    `escalated` is a subset of `regressed`: those that have now failed
+    `cfg.max_regressions` times and are handed to a person rather than cycled
+    again.
     """
     cfg = cfg or ValidationConfig()
     now = datetime.now(UTC)
@@ -76,6 +89,7 @@ async def auto_validate_recommendations(
 
     auto_validated: list[int] = []
     regressed: list[int] = []
+    escalated: list[int] = []
 
     # Phase 1: regressions — signature fired again today.
     for pattern in todays_patterns:
@@ -83,6 +97,7 @@ async def auto_validate_recommendations(
             rec.status = RecommendationStatus.IN_PROGRESS
             rec.regressed_at = now
             rec.evidence_count += 1
+            exhausted = rec.evidence_count >= cfg.max_regressions
             await audit_append(
                 session,
                 action=AuditAction.RECOMMENDATION_REGRESSED,
@@ -92,15 +107,35 @@ async def auto_validate_recommendations(
                     "signature": rec.signature,
                     "evidence_count": rec.evidence_count,
                     "reason": "trigger_recurrence",
+                    # Recorded on every entry so the chain shows when the loop
+                    # stopped being routine, not only that it did.
+                    "escalated": exhausted,
                 },
             )
             regressed.append(rec.id)
+            if exhausted:
+                # The engine keeps no further opinion. It has now failed the
+                # same way `max_regressions` times; deciding what that means
+                # is a command judgement, and it must be visible to make it.
+                await audit_append(
+                    session,
+                    action=AuditAction.RECOMMENDATION_ESCALATED,
+                    entity_type="recommendation",
+                    entity_id=rec.id,
+                    payload={
+                        "signature": rec.signature,
+                        "evidence_count": rec.evidence_count,
+                        "reason": "regressed_repeatedly",
+                    },
+                )
+                escalated.append(rec.id)
 
     # Phase 2: validations — DONE long enough without recurrence.
     # Use validated_at as proxy for "marked DONE at" — services that flip status
     # to DONE should stamp validated_at if no later step does so. (Backstop:
     # treat NULL validated_at as eligible since the rec exists.)
     regressed_ids = set(regressed)
+
     for rec in done_recs:
         if rec.id in regressed_ids:
             continue
@@ -123,7 +158,7 @@ async def auto_validate_recommendations(
             await notify_recommendation_auto_validated(session, rec)
             auto_validated.append(rec.id)
 
-    return auto_validated, regressed
+    return auto_validated, regressed, escalated
 
 
 def _pattern(signature: str) -> str:
