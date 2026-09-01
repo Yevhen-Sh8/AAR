@@ -34,6 +34,7 @@ class AuditAction(StrEnum):
     CONTEXT_ASSET_VALIDATED = "context_asset.validated"
     CONTEXT_ASSET_REJECTED = "context_asset.rejected"
     CONTEXT_ASSET_DEPRECATED = "context_asset.deprecated"
+    CONTEXT_ASSET_REAFFIRMED = "context_asset.reaffirmed"
     SIGNAL_CREATED = "signal.created"
     SIGNAL_REVIEWED = "signal.reviewed"
     SIGNAL_CONVERTED = "signal.converted"

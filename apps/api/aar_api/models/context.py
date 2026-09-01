@@ -67,6 +67,17 @@ class ContextAsset(Base):
         ForeignKey("context_assets.id"), nullable=True
     )
     rejection_reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Wave 13 (ADR-025): knowledge ages, and different kinds age at different
+    # speeds. `last_affirmed_at` restarts on every human re-confirmation; the
+    # freshness itself is computed in services/knowledge_aging.py and never
+    # stored, so no background job can quietly retire a validated lesson.
+    last_affirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    affirmed_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    #: Overrides the category half-life for this one asset. Null → category default.
+    review_after_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     confidence: Mapped[float | None] = mapped_column(nullable=True)
     usage_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(

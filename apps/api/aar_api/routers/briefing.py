@@ -32,6 +32,8 @@ class BriefItemOut(BaseModel):
     detail: str | None
     meta: str
     relevance: int
+    #: ADR-025: "fresh" / "aging" / "stale"; null where age means nothing.
+    freshness: str | None = None
 
 
 class MissionBriefOut(BaseModel):
@@ -81,7 +83,17 @@ class MissionSynthesisOut(BaseModel):
 def _synth_payload(brief: MissionBrief) -> dict[str, Any]:
     """Compact package for the LLM — titles + meta only, capped per section."""
     def items(xs: list, n: int = 6) -> list[dict[str, Any]]:
-        return [{"title": i.title, "detail": i.detail, "meta": i.meta} for i in xs[:n]]
+        # `freshness` travels with the lesson deliberately. Without it the model
+        # is handed a two-year-old EW pattern indistinguishable from last week's
+        # and will state it as the current picture — the brief asserting
+        # something false, which is worse than the brief being thin (ADR-025).
+        out: list[dict[str, Any]] = []
+        for i in xs[:n]:
+            row: dict[str, Any] = {"title": i.title, "detail": i.detail, "meta": i.meta}
+            if getattr(i, "freshness", None) is not None:
+                row["freshness"] = i.freshness
+            out.append(row)
+        return out
 
     return {
         "profile": {

@@ -33,6 +33,10 @@ class LoopKPIOut(BaseModel):
     endorsed_without_assessment: int
     caught_before_it_cost_anything: int
 
+    stale_validated_assets: int
+    aging_validated_assets: int
+    fresh_validated_assets: int
+
     msr_narrow: float
     msr_full: float
     launched_count: int

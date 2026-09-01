@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Library, CheckCircle2, XCircle, Archive } from "lucide-react";
+import { Library, CheckCircle2, XCircle, Archive, RefreshCw } from "lucide-react";
 import { apiFetch, IS_DEMO } from "../lib/api";
 
 interface ContextAsset {
@@ -16,10 +16,41 @@ interface ContextAsset {
   owner_role: string | null;
   created_at: string;
   validated_at: string | null;
+  // ADR-025 — computed at the response boundary, never stored, so no job can
+  // retire a lesson a person confirmed.
+  freshness: "fresh" | "aging" | "stale";
+  days_since_affirmed: number | null;
+  half_life_days: number;
+  affirmed_count: number;
+  review_after_days: number | null;
   // NB: the RESPONSE field is superseded_by_id (ContextAssetOut);
   // the deprecate REQUEST body uses superseded_by. Don't unify them.
   superseded_by_id: number | null;
 }
+
+const FRESHNESS: Record<
+  ContextAsset["freshness"],
+  { label: string; badge: string; note: string }
+> = {
+  fresh: {
+    label: "чинний",
+    badge: "badge-green",
+    note: "Підтверджено нещодавно — можна спиратися як на чинне знання.",
+  },
+  aging: {
+    label: "старіє",
+    badge: "badge-gold",
+    note: "Давно не підтверджували. Подавайте як ймовірне, не як факт.",
+  },
+  stale: {
+    label: "застарілий",
+    badge: "badge-red",
+    note:
+      "Потребує перепідтвердження. Актив далі живить брифінг — його ніхто не " +
+      "списує автоматично, — але там він позначений, і ШІ не стверджує його як " +
+      "поточну обстановку.",
+  },
+};
 
 // Values MUST match ContextAssetType in apps/api/aar_api/models/context.py —
 // the router types the query param as the enum, so anything else is a 422.
@@ -74,6 +105,12 @@ export default function ContextPage() {
   const validate = useMutation({
     mutationFn: (id: number) =>
       apiFetch<ContextAsset>(`/context/assets/${id}/validate`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["context-assets"] }),
+  });
+
+  const reaffirm = useMutation({
+    mutationFn: (id: number) =>
+      apiFetch<ContextAsset>(`/context/assets/${id}/reaffirm`, { method: "POST" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["context-assets"] }),
   });
 
@@ -190,6 +227,22 @@ export default function ContextPage() {
                           : "—"}
                       </td>
                     </tr>
+                    <tr>
+                      <td>Чинність</td>
+                      <td>
+                        <span className={`card-badge ${FRESHNESS[selected.freshness].badge}`}>
+                          {FRESHNESS[selected.freshness].label}
+                        </span>{" "}
+                        {selected.days_since_affirmed !== null && (
+                          <span style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                            підтверджено {selected.days_since_affirmed} дн. тому ·
+                            строк перегляду {selected.half_life_days} дн.
+                            {selected.affirmed_count > 1 &&
+                              ` · підтверджень: ${selected.affirmed_count}`}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
                     {selected.superseded_by_id && (
                       <tr>
                         <td>Замінений на</td>
@@ -237,17 +290,41 @@ export default function ContextPage() {
                     </button>
                   )}
                   {selected.status === "validated" && (
-                    <button
-                      className="secondary"
-                      onClick={() =>
-                        deprecate.mutate({ id: selected.id, supersededBy: null })
-                      }
-                      disabled={deprecate.isPending || IS_DEMO}
-                    >
-                      <Archive size={14} /> Перевести в deprecated
-                    </button>
+                    <>
+                      <button
+                        onClick={() => reaffirm.mutate(selected.id)}
+                        disabled={reaffirm.isPending || IS_DEMO}
+                        title="Урок досі чинний — перезапустити строк перегляду."
+                      >
+                        <RefreshCw size={14} /> Підтвердити чинність
+                      </button>
+                      <button
+                        className="secondary"
+                        onClick={() =>
+                          deprecate.mutate({ id: selected.id, supersededBy: null })
+                        }
+                        disabled={deprecate.isPending || IS_DEMO}
+                      >
+                        <Archive size={14} /> Перевести в deprecated
+                      </button>
+                    </>
                   )}
                 </div>
+
+                {selected.status === "validated" && selected.freshness !== "fresh" && (
+                  <p
+                    style={{
+                      fontSize: 12,
+                      marginTop: 12,
+                      color:
+                        selected.freshness === "stale"
+                          ? "var(--accent-red)"
+                          : "var(--accent-gold)",
+                    }}
+                  >
+                    {FRESHNESS[selected.freshness].note}
+                  </p>
+                )}
 
                 {IS_DEMO && (
                   <p style={{ color: "var(--accent-gold)", fontSize: 12, marginTop: 12 }}>

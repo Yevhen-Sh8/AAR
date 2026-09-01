@@ -14,6 +14,9 @@ interface LoopKPI {
   decision_quality_counts: Record<string, number>;
   endorsed_without_assessment: number;
   caught_before_it_cost_anything: number;
+  stale_validated_assets: number;
+  aging_validated_assets: number;
+  fresh_validated_assets: number;
   regressed_recommendations: number;
   validated_recommendations: number;
   open_cases_by_opr: Record<string, number>;
@@ -194,6 +197,51 @@ export default function LearningLoopPage() {
             хибне — успіхом. «Виправляють, не оцінивши» означає, що підрозділу
             призначили зміну, не з'ясувавши, винне рішення чи обставини: так
             тренуються проти невдачі, а не проти помилки.
+          </p>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Чинність бази досвіду</span>
+            <span
+              className={`card-badge ${d.stale_validated_assets > 0 ? "badge-red" : "badge-green"}`}
+            >
+              {d.stale_validated_assets} застарілих
+            </span>
+          </div>
+          <div className="stat-row" style={{ marginTop: 0, paddingTop: 0, borderTop: 0 }}>
+            <div className="stat-item">
+              <div className="stat-label">Чинні</div>
+              <div className="stat-value" style={{ color: "var(--accent-green)" }}>
+                {d.fresh_validated_assets}
+              </div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-label">Старіють</div>
+              <div className="stat-value" style={{ color: "var(--accent-gold)" }}>
+                {d.aging_validated_assets}
+              </div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-label" title="Потребують перепідтвердження, але й далі живлять брифінг.">
+                Застарілі
+              </div>
+              <div
+                className="stat-value"
+                style={{
+                  color: d.stale_validated_assets > 0 ? "var(--accent-red)" : undefined,
+                }}
+              >
+                {d.stale_validated_assets}
+              </div>
+            </div>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+            Знання старіє з різною швидкістю: патерн відмови чи тактика противника —
+            за місяці, рішення про будову системи — за роки. Застарілий урок не
+            списується сам (це зробила б машина замість людини), але в брифінгу він
+            позначений, стоїть нижче свіжого, і ШІ не подає його як поточну
+            обстановку. Зняти позначку — «Підтвердити чинність» у Контекст-активах.
           </p>
         </div>
 

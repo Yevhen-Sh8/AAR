@@ -31,8 +31,10 @@ from aar_api.models.aar import (
     RecommendationStatus,
     TriggerType,
 )
+from aar_api.models.context import AssetStatus, ContextAsset
 from aar_api.models.dictionaries import ItemType
 from aar_api.models.event import Item, Outcome, UsageEvent
+from aar_api.services import knowledge_aging as aging
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,13 @@ class LoopKPI:
     # records these, and the practice gets institutionalised because the
     # result looked good.
     caught_before_it_cost_anything: int
+
+    # Knowledge freshness (ADR-025). Validated assets still feeding the mission
+    # brief while overdue for re-confirmation — the brief speaking with more
+    # certainty than the knowledge behind it warrants.
+    stale_validated_assets: int
+    aging_validated_assets: int
+    fresh_validated_assets: int
 
     # Effectiveness denominators (literature insists on both)
     msr_narrow: float
@@ -216,6 +225,15 @@ async def compute_loop_kpi(
         and c.decision_quality in {DecisionQuality.FLAWED, DecisionQuality.ACCEPTABLE}
     )
 
+    validated_assets = list(
+        await session.scalars(
+            select(ContextAsset).where(ContextAsset.status == AssetStatus.VALIDATED)
+        )
+    )
+    freshness_tally = {aging.FRESH: 0, aging.AGING: 0, aging.STALE: 0}
+    for a in validated_assets:
+        freshness_tally[aging.freshness(a)] += 1
+
     return LoopKPI(
         time_to_validation_days_median=_percentile(ttv, 0.5),
         time_to_validation_days_p90=_percentile(ttv, 0.9),
@@ -230,6 +248,9 @@ async def compute_loop_kpi(
         decision_quality_counts=quality_counts,
         endorsed_without_assessment=endorsed_without_assessment,
         caught_before_it_cost_anything=caught_before_cost,
+        stale_validated_assets=freshness_tally[aging.STALE],
+        aging_validated_assets=freshness_tally[aging.AGING],
+        fresh_validated_assets=freshness_tally[aging.FRESH],
         msr_narrow=round(msr_narrow, 4),
         msr_full=round(msr_full, 4),
         launched_count=launched,
