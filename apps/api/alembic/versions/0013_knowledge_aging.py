@@ -6,8 +6,8 @@ Revises: 0012
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0013"
-down_revision = "0012"
+revision: str = "0013_knowledge_aging"
+down_revision: str | None = "0012_decision_quality"
 branch_labels = None
 depends_on = None
 
