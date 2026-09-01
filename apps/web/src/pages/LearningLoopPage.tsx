@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Clock, TrendingUp, AlertTriangle, DollarSign, Users } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { METRIC } from "../lib/metrics";
 
 interface LoopKPI {
   time_to_validation_days_median: number | null;
@@ -10,6 +11,12 @@ interface LoopKPI {
   cases_analysed_or_later: number;
   cases_validated_or_closed: number;
   recurrence_rate_pct: number;
+  decision_quality_counts: Record<string, number>;
+  endorsed_without_assessment: number;
+  caught_before_it_cost_anything: number;
+  stale_validated_assets: number;
+  aging_validated_assets: number;
+  fresh_validated_assets: number;
   regressed_recommendations: number;
   validated_recommendations: number;
   open_cases_by_opr: Record<string, number>;
@@ -57,6 +64,25 @@ function MetaCard({
     </div>
   );
 }
+
+interface ResponsePattern {
+  operator_code: string | null;
+  trigger: string;
+  cases: number;
+  recommendations: number;
+  distinct_responses: number;
+  dominant_text: string;
+  dominant_count: number;
+  dominant_share: number;
+}
+
+const TRIGGER_UK: Record<string, string> = {
+  msr_drop: "падіння успішності",
+  repeated_reason: "повтор причини",
+  item_anomaly: "аномалія виробу",
+  enterprise_drop: "падіння по підприємству",
+  manual: "відкрито вручну",
+};
 
 export default function LearningLoopPage() {
   const kpi = useQuery({
@@ -128,28 +154,143 @@ export default function LearningLoopPage() {
         />
       </div>
 
+      <ResponseDiversityCard />
+
       <div className="dashboard-grid">
         <div className="card">
           <div className="card-header">
-            <span className="card-title">MSR — обидва знаменники</span>
+            <span className="card-title">Якість рішень — окремо від наслідків</span>
+            <span className="card-badge badge-blue">
+              {Object.values(d.decision_quality_counts).reduce((a, b) => a + b, 0)} кейсів
+            </span>
+          </div>
+          <table className="data-table">
+            <tbody>
+              {[
+                ["sound", "Правильне рішення", "var(--accent-green)"],
+                ["acceptable", "Прийнятне, був кращий варіант", "var(--accent-gold)"],
+                ["flawed", "Хибне рішення", "var(--accent-red)"],
+                ["unassessed", "Не оцінено", "var(--text-muted)"],
+              ].map(([k, label, color]) => (
+                <tr key={k}>
+                  <td>{label}</td>
+                  <td style={{ textAlign: "right", fontWeight: 600, color }}>
+                    {d.decision_quality_counts[k] ?? 0}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="stat-row" style={{ marginTop: 12 }}>
+            <div className="stat-item">
+              <div
+                className="stat-label"
+                title="Кейси, доведені до стадії «призначено відповідального» і далі, у яких рішення так і не оцінене."
+              >
+                Виправляють, не оцінивши
+              </div>
+              <div
+                className="stat-value"
+                style={{
+                  color: d.endorsed_without_assessment > 0 ? "var(--accent-red)" : undefined,
+                }}
+              >
+                {d.endorsed_without_assessment}
+              </div>
+            </div>
+            <div className="stat-item">
+              <div
+                className="stat-label"
+                title="Кейси, відкриті людиною (не тригером) із хибним або лише прийнятним рішенням: показники були нормальні, ризик помітили самі."
+              >
+                Спіймано до наслідків
+              </div>
+              <div className="stat-value" style={{ color: "var(--accent-green)" }}>
+                {d.caught_before_it_cost_anything}
+              </div>
+            </div>
+          </div>
+
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+            Рішення оцінюється за тим, що було відомо на той момент, — не за тим,
+            чим усе скінчилось. Правильне рішення може закінчитись втратою,
+            хибне — успіхом. «Виправляють, не оцінивши» означає, що підрозділу
+            призначили зміну, не з'ясувавши, винне рішення чи обставини: так
+            тренуються проти невдачі, а не проти помилки.
+          </p>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Чинність бази досвіду</span>
+            <span
+              className={`card-badge ${d.stale_validated_assets > 0 ? "badge-red" : "badge-green"}`}
+            >
+              {d.stale_validated_assets} застарілих
+            </span>
+          </div>
+          <div className="stat-row" style={{ marginTop: 0, paddingTop: 0, borderTop: 0 }}>
+            <div className="stat-item">
+              <div className="stat-label">Чинні</div>
+              <div className="stat-value" style={{ color: "var(--accent-green)" }}>
+                {d.fresh_validated_assets}
+              </div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-label">Старіють</div>
+              <div className="stat-value" style={{ color: "var(--accent-gold)" }}>
+                {d.aging_validated_assets}
+              </div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-label" title="Потребують перепідтвердження, але й далі живлять брифінг.">
+                Застарілі
+              </div>
+              <div
+                className="stat-value"
+                style={{
+                  color: d.stale_validated_assets > 0 ? "var(--accent-red)" : undefined,
+                }}
+              >
+                {d.stale_validated_assets}
+              </div>
+            </div>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+            Знання старіє з різною швидкістю: патерн відмови чи тактика противника —
+            за місяці, рішення про будову системи — за роки. Застарілий урок не
+            списується сам (це зробила б машина замість людини), але в брифінгу він
+            позначений, стоїть нижче свіжого, і ШІ не подає його як поточну
+            обстановку. Зняти позначку — «Підтвердити чинність» у Контекст-активах.
+          </p>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Успішність за двома знаменниками</span>
             <span className="card-badge badge-blue">
               {d.launched_count + d.aborted_count} спроб
             </span>
           </div>
           <div style={{ display: "flex", gap: 24, marginBottom: 12 }}>
             <div>
-              <div className="stat-label">η_narrow (без абортів)</div>
+              <div className="stat-label" title={METRIC.msrNarrow.hint}>
+                {METRIC.msrNarrow.label}
+              </div>
               <div className="stat-value" style={{ fontSize: 28, color: "var(--accent-green)" }}>
                 {(d.msr_narrow * 100).toFixed(1)}%
               </div>
-              <div className="stat-sub">success / launched</div>
+              <div className="stat-sub">успішні ÷ запущені</div>
             </div>
             <div>
-              <div className="stat-label">η_full (з абортами)</div>
+              <div className="stat-label" title={METRIC.msrFull.hint}>
+                {METRIC.msrFull.label}
+              </div>
               <div className="stat-value" style={{ fontSize: 28, color: "var(--accent-gold)" }}>
                 {(d.msr_full * 100).toFixed(1)}%
               </div>
-              <div className="stat-sub">success / (launched + aborted)</div>
+              <div className="stat-sub">успішні ÷ (запущені + зриви)</div>
             </div>
           </div>
           <div className="stat-row" style={{ marginTop: 8 }}>
@@ -162,16 +303,16 @@ export default function LearningLoopPage() {
               <div className="stat-value">{d.launched_count}</div>
             </div>
             <div className="stat-item">
-              <div className="stat-label">Аборти</div>
+              <div className="stat-label">Зриви</div>
               <div className="stat-value" style={{ color: "var(--accent-gold)" }}>
                 {d.aborted_count}
               </div>
             </div>
           </div>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
-            Аборт = подія, що не дійшла до запуску (РЕБ-перешкоди, погода, передстартова
-            відмова техніки). Літературна норма: η_narrow ~43%, η_full ~20–30% — треба
-            відстежувати обидва, інакше керівництво бачить лише оптимістичну картину.
+            Зрив = спроба, що не дійшла до запуску (РЕБ-перешкоди, погода, передстартова
+            відмова техніки). Літературна норма: без зривів ~43%, зі зривами ~20–30% —
+            треба відстежувати обидва, інакше керівництво бачить лише оптимістичну картину.
           </p>
         </div>
 
@@ -246,6 +387,92 @@ export default function LearningLoopPage() {
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Where the remedial answer never changes (ADR-026).
+ *
+ * Reports the repetition and stops there. Whether it has made the unit
+ * readable to an adversary depends on the operational picture, which the
+ * reader has and this screen does not — so the screen states the fact and
+ * leaves the conclusion where it belongs.
+ */
+function ResponseDiversityCard() {
+  const q = useQuery({
+    queryKey: ["response-diversity"],
+    queryFn: () => apiFetch<ResponsePattern[]>("/learning/response-diversity"),
+  });
+  const rows = q.data ?? [];
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Однакова відповідь на однакову ситуацію</span>
+        <span className={`card-badge ${rows.length > 0 ? "badge-gold" : "badge-green"}`}>
+          {rows.length} закономірностей
+        </span>
+      </div>
+
+      {q.isLoading && <div className="loading">Завантаження…</div>}
+      {q.isError && <div className="error-msg">Не вдалося порахувати.</div>}
+
+      {!q.isLoading && !q.isError && rows.length === 0 && (
+        <div className="loading">
+          Жодного тригера, на який відповідають однією й тією ж дією тричі
+          поспіль. Реакція різноманітна.
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Експлуатант</th>
+              <th>Тригер</th>
+              <th>Кейсів</th>
+              <th>Різних відповідей</th>
+              <th>Повторювана дія</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => (
+              <tr key={`${p.operator_code}-${p.trigger}`}>
+                <td className="mono">{p.operator_code ?? "—"}</td>
+                <td>{TRIGGER_UK[p.trigger] ?? p.trigger}</td>
+                <td>{p.cases}</td>
+                <td
+                  style={{
+                    fontWeight: 600,
+                    color: p.distinct_responses === 1 ? "var(--accent-red)" : undefined,
+                  }}
+                >
+                  {p.distinct_responses}
+                </td>
+                <td style={{ fontSize: 12 }}>
+                  «{p.dominant_text}»{" "}
+                  <span style={{ color: "var(--text-muted)" }}>
+                    — {p.dominant_count} з {p.recommendations}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+        Тут показано <strong>факт повторення</strong>: на цей тригер у цього
+        експлуатанта раз за разом призначають ту саму дію. Чи означає це, що
+        поведінку підрозділу вже можна передбачити ззовні — вирішувати вам:
+        це залежить від обстановки, якої система не знає.
+        <br />
+        Не плутати з «recurrence rate»: той показує, що <em>виправлення не
+        спрацювало</em> і проблема повернулась. Цей — що <em>відповідь
+        не змінюється</em>. Рекомендація може бути цілком дієвою й водночас
+        цілком передбачуваною.
+      </p>
     </div>
   );
 }

@@ -101,5 +101,10 @@ def audit_payload(
         return payload
     redacted = dict(payload)
     redacted["originator_user_id"] = None
+    # `transcribed_by` names the person who TYPED the report, not its author —
+    # but on an anonymous row it still narrows the field: the author is someone
+    # who handed paper to that particular manager. In a unit of a dozen people
+    # that is most of the way to a name, so it goes with the originator.
+    redacted["transcribed_by"] = None
     redacted["originator_redacted"] = True
     return redacted

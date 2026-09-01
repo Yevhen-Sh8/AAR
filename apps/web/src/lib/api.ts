@@ -4,7 +4,7 @@ const DEMO = import.meta.env.VITE_DEMO === "true";
 
 // Live API base resolution:
 //   - demo build        → static mock JSON under <base>/mock
-//   - VITE_API_BASE set  → absolute backend URL (e.g. https://aar-api.onrender.com/api)
+//   - VITE_API_BASE set  → absolute backend URL (e.g. https://aar.example.com/api)
 //   - otherwise          → same-origin "/api" (nginx proxy / vite dev proxy)
 function safeBase(raw: string): string {
   if (!raw) return "/api";
@@ -27,6 +27,23 @@ export const API_BASE = safeBase(import.meta.env.VITE_API_BASE || "/api");
 const BASE = DEMO ? `${import.meta.env.BASE_URL}mock` : API_BASE;
 
 const MOCK_ROUTES: Record<string, string> = {
+  // More specific /aar prefixes first — matching is startsWith.
+  "/aar/my-report-requests": "/my-report-requests.json",
+  "/aar/my-observations": "/my-observations.json",
+  "/aar/report-coverage": "/report-coverage.json",
+  // Per-case report lists: "/aar/cases" (below) would otherwise swallow
+  // "/aar/cases/{id}/reports" and serve the case list as if it were reports.
+  "/aar/cases/27/recommendations": "/case-recommendations.json",
+  "/aar/cases/26/recommendations": "/case-recommendations.json",
+  "/aar/cases/25/recommendations": "/case-recommendations.json",
+  "/aar/cases/24/recommendations": "/case-recommendations.json",
+  "/aar/cases/22/recommendations": "/case-recommendations.json",
+  "/aar/cases/27/reports": "/case-reports.json",
+  "/aar/cases/26/reports": "/case-reports.json",
+  "/aar/cases/25/reports": "/case-reports.json",
+  "/aar/cases/24/reports": "/case-reports.json",
+  "/aar/cases/22/reports": "/case-reports.json",
+  "/aar/cases/18/reports": "/case-reports.json",
   "/reports/monthly": "/monthly.json",
   "/reports/daily": "/daily.json",
   "/aar/cases": "/cases.json",
@@ -38,6 +55,7 @@ const MOCK_ROUTES: Record<string, string> = {
   "/dictionaries/loss-reasons": "/loss-reasons.json",
   "/dictionaries/repair-reasons": "/repair-reasons.json",
   "/dictionaries/item-types": "/item-types.json",
+  "/learning/response-diversity": "/response-diversity.json",
   "/audit/log": "/audit-log.json",
   "/audit/verify": "/audit-verify.json",
   "/context/assets": "/context-assets.json",

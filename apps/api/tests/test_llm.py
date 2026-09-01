@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 from httpx import ASGITransport, AsyncClient
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from aar_api.core.config import get_settings
 from aar_api.core.db import _engine
 from aar_api.main import app
-from aar_api.models.aar import AARCase, TriggerType
+from aar_api.models.aar import AARCase, IndividualReport, TriggerType
 from aar_api.models.context import AssetStatus, ContextAsset, ContextAssetType
 from aar_api.models.dictionaries import LossReason, Zone
 from aar_api.services import llm as llm_service
@@ -62,8 +63,24 @@ async def test_classify_with_mocked_anthropic() -> None:
             }
 
 
+async def _add_report(case_id: int, *, submitted: bool, **fields) -> None:
+    Session = async_sessionmaker(_engine, expire_on_commit=False)
+    async with Session() as s:
+        s.add(
+            IndividualReport(
+                case_id=case_id,
+                submitted_at=datetime.now(UTC) if submitted else None,
+                requested_at=datetime.now(UTC),
+                **fields,
+            )
+        )
+        await s.commit()
+
+
 async def test_draft_analysis_uses_case_context() -> None:
     case_id = await _seed()
+    # A case with actual testimony — the normal path.
+    await _add_report(case_id, submitted=True, what_happened="Втрата над ціллю")
     draft = "## Контекст\nТест.\n## Рекомендації\n1. Довчання."
     fake = llm_service.LLMResult(task_output=draft, context_assets=[])
 
@@ -73,9 +90,61 @@ async def test_draft_analysis_uses_case_context() -> None:
             r = await client.post(f"/llm/cases/{case_id}/draft-analysis")
             assert r.status_code == 200
             assert r.json()["markdown"] == draft
+            assert r.json()["reports_used"] == 1
+            assert r.json()["reports_pending"] == 0
             kwargs = m.call_args.kwargs
             assert kwargs["case_title"] == "Зниження MSR_c у E-07"
             assert kwargs["trigger"] == "msr_drop"
+
+
+async def test_draft_analysis_refuses_a_case_with_no_testimony() -> None:
+    """A fluent analysis with zero evidence is worse than no analysis.
+
+    It would be persisted with a model name and timestamp, then propagate into
+    every future mission brief once the case is validated/closed.
+    """
+    case_id = await _seed()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.post(f"/llm/cases/{case_id}/draft-analysis")
+        assert r.status_code == 409, r.text
+        assert "звіт" in r.json()["detail"]
+
+
+async def test_pending_stubs_are_not_evidence() -> None:
+    """Requested-but-unanswered reports must not count as testimony.
+
+    Their six narrative columns are all NULL, so passing them to the model
+    reads as "participants reported nothing" instead of "nobody answered yet".
+    """
+    case_id = await _seed()
+    await _add_report(case_id, submitted=False)  # requested, never answered
+    await _add_report(case_id, submitted=False)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.post(f"/llm/cases/{case_id}/draft-analysis")
+        assert r.status_code == 409, r.text
+        assert "2" in r.json()["detail"], "should say how many are outstanding"
+
+
+async def test_force_allows_an_events_only_analysis() -> None:
+    """Escape hatch for T1/T4 cases whose evidence is genuinely events-only."""
+    case_id = await _seed()
+    await _add_report(case_id, submitted=False)
+    draft = "## Контекст\nЛише події."
+    fake = llm_service.LLMResult(task_output=draft, context_assets=[])
+
+    with patch.object(llm_service, "draft_case_analysis", return_value=fake) as m:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            r = await client.post(
+                f"/llm/cases/{case_id}/draft-analysis", params={"force": "true"}
+            )
+            assert r.status_code == 200, r.text
+            assert r.json()["reports_used"] == 0
+            assert r.json()["reports_pending"] == 1
+            # The unanswered stub must still be absent from the prompt.
+            assert m.call_args.kwargs["individual_reports"] == []
 
 
 async def test_analogies_returns_empty_when_no_knowledge() -> None:

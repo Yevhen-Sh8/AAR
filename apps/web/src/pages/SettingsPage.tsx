@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Settings as SettingsIcon, ExternalLink, DatabaseBackup } from "lucide-react";
 import { API_BASE, IS_DEMO } from "../lib/api";
-import { getToken } from "../lib/auth";
+import { downloadFile } from "../lib/download";
 
 const APP_VERSION = "1.8.0";
 
 const FEATURES = [
   { key: "Two-level data model", state: "available", note: "Events → AAR Cases" },
-  { key: "Daily / monthly reports (η, η_c, λ_c)", state: "available", note: "XLSX + PDF" },
+  { key: "Daily / monthly reports (MSR, MSR_c, CLR)", state: "available", note: "XLSX + PDF" },
   { key: "AAR triggers T1–T5", state: "available", note: "msr_drop, repeated_reason, item_anomaly, enterprise_drop, manual" },
   { key: "Audit hash-chain (SHA-256)", state: "available", note: "append-only, /audit/verify" },
   { key: "CSV/XLSX bulk import", state: "available", note: "POST /events/import" },
@@ -44,29 +44,14 @@ export default function SettingsPage() {
   async function downloadBackup() {
     setBackupBusy(true);
     setBackupError(null);
-    try {
-      const token = getToken();
-      const resp = await fetch(`${API_BASE}/admin/export`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!resp.ok) {
-        setBackupError(`Помилка експорту (${resp.status}). Потрібна роль admin.`);
-        return;
-      }
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `aar-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      setBackupError("Не вдалося з'єднатися з сервером.");
-    } finally {
-      setBackupBusy(false);
-    }
+    // Same path as the report exports: this was the one place already doing it
+    // correctly, and it is now the shared helper rather than a local copy.
+    const res = await downloadFile(
+      "/admin/export",
+      `aar-backup-${new Date().toISOString().slice(0, 10)}.json`,
+    );
+    if (!res.ok) setBackupError(res.error);
+    setBackupBusy(false);
   }
 
   const env = {

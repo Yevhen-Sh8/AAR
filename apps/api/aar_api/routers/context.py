@@ -12,13 +12,16 @@ from aar_api.schemas.context import (
     ContextAssetOut,
     DeprecateRequest,
     RejectRequest,
+    ReviewWindowRequest,
 )
 from aar_api.services.audit import append as audit_append
 from aar_api.services.context_assets import (
     deprecate_asset,
+    reaffirm_asset,
     reject_asset,
     validate_asset,
 )
+from aar_api.services.knowledge_aging import asset_out
 
 router = APIRouter(prefix="/context", tags=["context"])
 
@@ -37,7 +40,7 @@ async def list_assets(
     source_agent: str | None = Query(default=None),
     limit: int = Query(default=100, le=500),
     session: AsyncSession = Depends(get_session),
-) -> list[ContextAsset]:
+) -> list[ContextAssetOut]:
     stmt = select(ContextAsset).order_by(ContextAsset.id.desc()).limit(limit)
     if type:
         stmt = stmt.where(ContextAsset.type == type)
@@ -46,20 +49,20 @@ async def list_assets(
     if source_agent:
         stmt = stmt.where(ContextAsset.source_agent == source_agent)
     rows = await session.scalars(stmt)
-    return list(rows)
+    return [ContextAssetOut(**asset_out(a)) for a in rows]
 
 
 @router.get("/assets/{asset_id}", response_model=ContextAssetOut)
 async def get_asset(
     asset_id: int, session: AsyncSession = Depends(get_session)
-) -> ContextAsset:
-    return await _get_asset(session, asset_id)
+) -> ContextAssetOut:
+    return ContextAssetOut(**asset_out(await _get_asset(session, asset_id)))
 
 
 @router.post("/assets", response_model=ContextAssetOut, status_code=201)
 async def create_asset(
     payload: ContextAssetIn, session: AsyncSession = Depends(get_session)
-) -> ContextAsset:
+) -> ContextAssetOut:
     """Manual creation — also starts as DRAFT (ADR-008).
 
     DELIBERATELY has no `require_role`, unlike validate/reject/deprecate below.
@@ -96,7 +99,7 @@ async def create_asset(
     )
     await session.commit()
     await session.refresh(asset)
-    return asset
+    return ContextAssetOut(**asset_out(asset))
 
 
 @router.post(
@@ -106,14 +109,14 @@ async def create_asset(
 )
 async def validate(
     asset_id: int, session: AsyncSession = Depends(get_session)
-) -> ContextAsset:
+) -> ContextAssetOut:
     asset = await _get_asset(session, asset_id)
     if asset.status not in (AssetStatus.DRAFT, AssetStatus.REJECTED):
         raise HTTPException(409, f"cannot validate from status={asset.status.value}")
     await validate_asset(session, asset, user_id=None)
     await session.commit()
     await session.refresh(asset)
-    return asset
+    return ContextAssetOut(**asset_out(asset))
 
 
 @router.post(
@@ -125,14 +128,14 @@ async def reject(
     asset_id: int,
     payload: RejectRequest,
     session: AsyncSession = Depends(get_session),
-) -> ContextAsset:
+) -> ContextAssetOut:
     asset = await _get_asset(session, asset_id)
     if asset.status != AssetStatus.DRAFT:
         raise HTTPException(409, f"can only reject DRAFT, got {asset.status.value}")
     await reject_asset(session, asset, reason=payload.reason)
     await session.commit()
     await session.refresh(asset)
-    return asset
+    return ContextAssetOut(**asset_out(asset))
 
 
 @router.post(
@@ -144,7 +147,7 @@ async def deprecate(
     asset_id: int,
     payload: DeprecateRequest,
     session: AsyncSession = Depends(get_session),
-) -> ContextAsset:
+) -> ContextAssetOut:
     asset = await _get_asset(session, asset_id)
     if asset.status != AssetStatus.VALIDATED:
         raise HTTPException(409, "can only deprecate VALIDATED assets")
@@ -155,4 +158,59 @@ async def deprecate(
     await deprecate_asset(session, asset, superseded_by=payload.superseded_by)
     await session.commit()
     await session.refresh(asset)
-    return asset
+    return ContextAssetOut(**asset_out(asset))
+
+
+@router.post(
+    "/assets/{asset_id}/reaffirm",
+    response_model=ContextAssetOut,
+    dependencies=[Depends(require_role(Role.MANAGER, Role.ANALYST, Role.ADMIN))],
+)
+async def reaffirm(
+    asset_id: int, session: AsyncSession = Depends(get_session)
+) -> ContextAssetOut:
+    """Confirm an ageing lesson still holds; the freshness clock restarts.
+
+    Only meaningful on a VALIDATED asset: a draft has not been confirmed once
+    yet, and a deprecated one was deliberately retired. Re-affirming either
+    would launder a status change through the back door.
+    """
+    asset = await _get_asset(session, asset_id)
+    if asset.status != AssetStatus.VALIDATED:
+        raise HTTPException(
+            409, f"перепідтвердити можна лише validated-актив, а не {asset.status.value}"
+        )
+    await reaffirm_asset(session, asset, user_id=None)
+    await session.commit()
+    await session.refresh(asset)
+    return ContextAssetOut(**asset_out(asset))
+
+
+@router.patch(
+    "/assets/{asset_id}/review-window",
+    response_model=ContextAssetOut,
+    dependencies=[Depends(require_role(Role.MANAGER, Role.ADMIN))],
+)
+async def set_review_window(
+    asset_id: int,
+    payload: ReviewWindowRequest,
+    session: AsyncSession = Depends(get_session),
+) -> ContextAssetOut:
+    """Override how long THIS asset stays trustworthy; null restores the default.
+
+    The category half-lives are a policy guess. Some lessons are timeless and
+    some rot in a fortnight, and the person who wrote it knows better than the
+    table does.
+    """
+    asset = await _get_asset(session, asset_id)
+    asset.review_after_days = payload.review_after_days
+    await audit_append(
+        session,
+        action=AuditAction.CONTEXT_ASSET_REAFFIRMED,
+        entity_type="context_asset",
+        entity_id=asset.id,
+        payload={"review_after_days": payload.review_after_days, "window_change": True},
+    )
+    await session.commit()
+    await session.refresh(asset)
+    return ContextAssetOut(**asset_out(asset))

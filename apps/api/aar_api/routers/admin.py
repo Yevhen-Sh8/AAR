@@ -1,14 +1,12 @@
 """Wave 5 hardening: browser-only data export for pilot backup hygiene.
 
-Render's free Postgres plan has no automatic backups and expires after 90
-days (see docs/DEPLOY.md). This deploy is operated entirely from a browser
-(no terminal/shell access), so a full pg_dump workflow isn't practical day
-to day. This endpoint lets an admin download a complete JSON snapshot of the
-operational tables straight from the browser as a supplementary safety net.
+A self-hosted Postgres has no automatic backups unless the operator sets them
+up, and during a pilot that is easy to postpone. This endpoint lets an admin
+pull a complete JSON snapshot of the operational tables straight from the
+browser, without shell access to the host.
 
-This is NOT a substitute for real point-in-time recovery — for production
-use, upgrade the Render Postgres plan (adds automated daily backups + PITR)
-per docs/DEPLOY.md.
+This is NOT a substitute for point-in-time recovery. For real use, run a
+scheduled pg_dump on the host and verify a restore — see docs/DEPLOY.md §7.
 """
 import json
 from datetime import UTC, date, datetime

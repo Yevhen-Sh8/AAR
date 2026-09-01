@@ -59,15 +59,42 @@ async def persist_drafts(
 async def validate_asset(
     session: AsyncSession, asset: ContextAsset, *, user_id: int | None
 ) -> ContextAsset:
+    now = datetime.now(UTC)
     asset.status = AssetStatus.VALIDATED
     asset.validated_by_user_id = user_id
-    asset.validated_at = datetime.now(UTC)
+    asset.validated_at = now
+    # Starts the freshness clock (ADR-025). Validation IS the first affirmation.
+    asset.last_affirmed_at = now
+    asset.affirmed_count = 1
     await audit_append(
         session,
         action=AuditAction.CONTEXT_ASSET_VALIDATED,
         entity_type="context_asset",
         entity_id=asset.id,
         payload={"user_id": user_id},
+    )
+    return asset
+
+
+async def reaffirm_asset(
+    session: AsyncSession, asset: ContextAsset, *, user_id: int | None
+) -> ContextAsset:
+    """A person confirms an ageing lesson still holds; the clock restarts.
+
+    This is the deliberate counterpart to never auto-deprecating (ADR-025).
+    Freshness is computed, so nothing expires on its own — but nothing renews
+    on its own either. Somebody has to look at the lesson and say it is still
+    true, and the chain records who and when.
+    """
+    now = datetime.now(UTC)
+    asset.last_affirmed_at = now
+    asset.affirmed_count = (asset.affirmed_count or 0) + 1
+    await audit_append(
+        session,
+        action=AuditAction.CONTEXT_ASSET_REAFFIRMED,
+        entity_type="context_asset",
+        entity_id=asset.id,
+        payload={"user_id": user_id, "affirmed_count": asset.affirmed_count},
     )
     return asset
 

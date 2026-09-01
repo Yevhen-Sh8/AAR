@@ -13,14 +13,22 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.db import get_session
+from aar_api.core.rbac import require_role
 from aar_api.models.aar import AARCase, TriggerType
 from aar_api.models.audit import AuditAction
 from aar_api.models.integration import WebhookEventKind
 from aar_api.models.signal import PreTaskSignal, SignalKind, SignalStatus
+from aar_api.models.user import Role
 from aar_api.services.audit import append as audit_append
 from aar_api.services.integrations import dispatch
 
 router = APIRouter(prefix="/signals", tags=["signals"])
+
+# SUBMITTING a signal stays open to any authenticated user — a low barrier is
+# the entire point (ADR-021), same shape as creating a draft context asset.
+# REVIEWING one is a decision about someone else's warning: accepting,
+# dismissing or escalating it into a case changes what the unit acts on.
+_signal_reviewer = Depends(require_role(Role.ADMIN, Role.MANAGER, Role.ANALYST))
 
 # Review transitions only move forward from NEW/ACKNOWLEDGED; terminal states
 # (accepted / dismissed / converted) are final for this minimal lifecycle.
@@ -109,7 +117,10 @@ async def list_signals(
     return list(await session.scalars(stmt))
 
 
-@router.post("/{signal_id}/review", response_model=SignalOut)
+@router.post(
+    "/{signal_id}/review", response_model=SignalOut,
+    dependencies=[_signal_reviewer],
+)
 async def review_signal(
     signal_id: int,
     payload: SignalReviewIn,
@@ -141,7 +152,10 @@ async def review_signal(
     return signal
 
 
-@router.post("/{signal_id}/convert", response_model=SignalOut)
+@router.post(
+    "/{signal_id}/convert", response_model=SignalOut,
+    dependencies=[_signal_reviewer],
+)
 async def convert_signal_to_case(
     signal_id: int, session: AsyncSession = Depends(get_session)
 ) -> PreTaskSignal:

@@ -1,0 +1,14 @@
+{
+  "case_id": 26,
+  "submitted": 2,
+  "pending": 1,
+  "functions": {
+    "crew": 2,
+    "unknown": 1
+  },
+  "zones_covered": ["operator"],
+  "zones_missing": ["external", "manufacturer"],
+  "off_roster_count": 1,
+  "single_function_only": true,
+  "anonymity_floor": 3
+}

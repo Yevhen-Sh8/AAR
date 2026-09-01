@@ -5,12 +5,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from aar_api.core.db import get_session
 from aar_api.models.audit import AuditAction
 from aar_api.models.dictionaries import ItemType, LossReason, Operator, RepairReason
 from aar_api.models.event import Item, Outcome, UsageEvent
-from aar_api.schemas.event import UsageEventIn, UsageEventOut
+from aar_api.schemas.event import UsageEventIn, UsageEventListOut, UsageEventOut
 from aar_api.services.audit import append as audit_append
 from aar_api.services.imports import parse_bytes
 
@@ -72,6 +73,14 @@ async def create_event(
         loss_reason_id=loss_id,
         repair_reason_id=repair_id,
         notes=payload.notes,
+        # Accepted by the schema and then silently dropped here, so `aborted`
+        # was False for EVERY event ever created through the API or import.
+        # That killed the whole MSR-narrow / MSR-full distinction (Wave 2):
+        # abort counters read zero everywhere and MSR-full equalled MSR-narrow
+        # by construction — a metric that cannot differ from the one beside it
+        # is not a second opinion, it is decoration.
+        aborted=payload.aborted,
+        abort_reason=payload.abort_reason,
     )
     session.add(event)
     await session.flush()
@@ -91,7 +100,7 @@ async def create_event(
     return event
 
 
-@router.get("", response_model=list[UsageEventOut])
+@router.get("", response_model=list[UsageEventListOut])
 async def list_events(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
@@ -99,8 +108,30 @@ async def list_events(
     outcome: Outcome | None = Query(default=None),
     limit: int = Query(default=100, le=1000),
     session: AsyncSession = Depends(get_session),
-) -> list[UsageEvent]:
-    stmt = select(UsageEvent)
+) -> list[UsageEventListOut]:
+    """List events with the codes resolved.
+
+    The joins replace `item_id` / `operator_id` in the response. Returning row
+    ids from a per-serial-number tracking system made the list unreadable and
+    made it impossible to pick an event for an Order #440 act.
+    """
+    lr = aliased(LossReason)
+    rr = aliased(RepairReason)
+    stmt = (
+        select(
+            UsageEvent,
+            Item.serial_no,
+            ItemType.code.label("item_type_code"),
+            Operator.code.label("operator_code"),
+            lr.code.label("loss_code"),
+            rr.code.label("repair_code"),
+        )
+        .join(Item, Item.id == UsageEvent.item_id)
+        .join(ItemType, ItemType.id == Item.item_type_id)
+        .join(Operator, Operator.id == UsageEvent.operator_id)
+        .join(lr, lr.id == UsageEvent.loss_reason_id, isouter=True)
+        .join(rr, rr.id == UsageEvent.repair_reason_id, isouter=True)
+    )
     if date_from:
         stmt = stmt.where(UsageEvent.event_date >= date_from)
     if date_to:
@@ -111,8 +142,27 @@ async def list_events(
     if outcome:
         stmt = stmt.where(UsageEvent.outcome == outcome)
     stmt = stmt.order_by(UsageEvent.event_date.desc(), UsageEvent.id.desc()).limit(limit)
-    rows = await session.scalars(stmt)
-    return list(rows)
+
+    return [
+        UsageEventListOut(
+            id=ev.id,
+            client_event_id=ev.client_event_id,
+            event_date=ev.event_date,
+            outcome=ev.outcome,
+            item_serial_no=serial,
+            item_type_code=type_code,
+            operator_code=op_code,
+            loss_reason_code=loss_code,
+            repair_reason_code=repair_code,
+            notes=ev.notes,
+            aborted=ev.aborted,
+            abort_reason=ev.abort_reason,
+            recorded_at=ev.recorded_at,
+        )
+        for ev, serial, type_code, op_code, loss_code, repair_code in (
+            await session.execute(stmt)
+        ).all()
+    ]
 
 
 @router.get("/geojson")
@@ -229,6 +279,14 @@ async def _persist_event(
         loss_reason_id=loss_id,
         repair_reason_id=repair_id,
         notes=payload.notes,
+        # Accepted by the schema and then silently dropped here, so `aborted`
+        # was False for EVERY event ever created through the API or import.
+        # That killed the whole MSR-narrow / MSR-full distinction (Wave 2):
+        # abort counters read zero everywhere and MSR-full equalled MSR-narrow
+        # by construction — a metric that cannot differ from the one beside it
+        # is not a second opinion, it is decoration.
+        aborted=payload.aborted,
+        abort_reason=payload.abort_reason,
     )
     session.add(event)
     await session.flush()

@@ -29,6 +29,7 @@ from aar_api.models.context import AssetStatus, ContextAsset
 from aar_api.models.dictionaries import ItemType, LossReason, Operator
 from aar_api.models.event import Item, Outcome, UsageEvent
 from aar_api.models.signal import PreTaskSignal, SignalStatus
+from aar_api.services import knowledge_aging as aging
 
 _TOKEN_RE = re.compile(r"[\wа-яіїєґА-ЯІЇЄҐ]{3,}", re.UNICODE)
 
@@ -64,6 +65,20 @@ class ProfileStats:
     top_loss_reasons: list[str] = field(default_factory=list)
 
 
+def _age_meta(asset: ContextAsset) -> str:
+    """Human-readable age tag for a lesson, in the brief's own meta line."""
+    state = aging.freshness(asset)
+    days = aging.days_since_affirmed(asset)
+    if state == aging.FRESH:
+        return ""
+    age = f"{days} дн." if days is not None else "невідомо коли"
+    return (
+        f" · ⚠ ЗАСТАРІЛИЙ, підтверджено {age} тому — потребує перепідтвердження"
+        if state == aging.STALE
+        else f" · старіє, підтверджено {age} тому"
+    )
+
+
 @dataclass
 class BriefItem:
     id: int
@@ -71,6 +86,10 @@ class BriefItem:
     detail: str | None
     meta: str
     relevance: int
+    #: ADR-025 — "fresh" / "aging" / "stale" for knowledge that ages; None for
+    #: items where age carries no meaning (an open recommendation is not stale,
+    #: it is unfinished).
+    freshness: str | None = None
 
 
 @dataclass
@@ -143,14 +162,23 @@ async def compute_mission_brief(
             .limit(_CANDIDATE_CAP)
         )
     )
+    # A lesson validated two years ago is not automatically true today, and an
+    # EW pattern from then almost certainly is not. It still goes into the
+    # brief — a person validated it and only a person may retire it (ADR-025) —
+    # but it is labelled, and a stale one sinks below a fresh one of equal
+    # textual relevance so the planner reads the current picture first.
+    _FRESHNESS_RANK = {aging.FRESH: 2, aging.AGING: 1, aging.STALE: 0}
     validated_lessons = rank([
         BriefItem(
             id=a.id,
             title=a.title,
             detail=a.description,
             meta=f"{a.type.value}"
-            + (f" · conf={a.confidence:.2f}" if a.confidence is not None else ""),
-            relevance=_score(tokens, a.title, a.description),
+            + (f" · conf={a.confidence:.2f}" if a.confidence is not None else "")
+            + _age_meta(a),
+            relevance=_score(tokens, a.title, a.description)
+            + _FRESHNESS_RANK[aging.freshness(a)],
+            freshness=aging.freshness(a),
         )
         for a in asset_rows
     ])

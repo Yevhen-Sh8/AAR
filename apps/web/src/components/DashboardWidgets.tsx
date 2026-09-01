@@ -1,4 +1,5 @@
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { METRIC } from "../lib/metrics";
 import {
   AreaChart,
   Area,
@@ -12,6 +13,8 @@ import {
 
 interface MetricCardProps {
   title: string;
+  /** Розшифровка показника — спливає при наведенні на заголовок. */
+  titleHint?: string;
   value: number | string;
   unit?: string;
   badge?: string;
@@ -22,12 +25,12 @@ interface MetricCardProps {
 }
 
 export function MetricCard({
-  title, value, unit, badge, badgeType = "green", trend, sparkData, stats,
+  title, titleHint, value, unit, badge, badgeType = "green", trend, sparkData, stats,
 }: MetricCardProps) {
   return (
     <div className="card">
       <div className="card-header">
-        <span className="card-title">{title}</span>
+        <span className="card-title" title={titleHint}>{title}</span>
         {badge && <span className={`card-badge badge-${badgeType}`}>{badge}</span>}
       </div>
       <div className="big-number-row">
@@ -124,7 +127,7 @@ export function RatingTable({ rows }: { rows: RatingRow[] }) {
           <th>#</th>
           <th>Експлуатант</th>
           <th>Spark</th>
-          <th>η_c</th>
+          <th title={METRIC.msrC.hint}>{METRIC.msrC.short}</th>
           <th>Статус</th>
         </tr>
       </thead>
@@ -186,17 +189,24 @@ export function SignalList({ signals }: { signals: Signal[] }) {
   );
 }
 
-export function AIInsight({ text, confidence }: { text: string; confidence?: number }) {
+/**
+ * A sentence COMPUTED from the figures already on this screen.
+ *
+ * Was `AIInsight`, labelled «Кореляційний інсайт» and stamped with a hardcoded
+ * «Довіра 0.84». Both were untrue: no model produced the text (it is a
+ * template over msr_c / clr / needs_training) and no confidence was ever
+ * calculated. A fabricated certainty score standing beside real MSR numbers
+ * costs the reader's trust in every genuine figure on the page — and it
+ * contradicts our own posture that AI never asserts and humans validate
+ * (ADR-008). Real LLM output lives on the mission brief, where it carries
+ * evidence and is labelled as a draft.
+ */
+export function DerivedNote({ text }: { text: string }) {
   return (
     <div className="ai-insight">
       <div className="ai-insight-header">
-        <span>Ai</span>
-        Кореляційний інсайт
-        {confidence !== undefined && (
-          <span style={{ color: "var(--text-secondary)", fontSize: 12, marginLeft: "auto" }}>
-            Довіра {confidence.toFixed(2)}
-          </span>
-        )}
+        <span>Σ</span>
+        Розраховано з показників вище
       </div>
       <p>{text}</p>
     </div>

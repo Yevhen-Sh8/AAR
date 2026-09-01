@@ -1,16 +1,18 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.config import get_settings
 from aar_api.core.db import get_session
+from aar_api.core.rbac import require_role
 from aar_api.models.aar import AARCase, IndividualReport
 from aar_api.models.audit import AuditAction
 from aar_api.models.dictionaries import LossReason, Operator, RepairReason
 from aar_api.models.event import UsageEvent
+from aar_api.models.user import Role
 from aar_api.schemas.llm import (
     AnalogyMatchOut,
     AnalogyResponse,
@@ -19,6 +21,7 @@ from aar_api.schemas.llm import (
     DraftAnalysisResponse,
 )
 from aar_api.services import llm as llm_service
+from aar_api.services import redaction
 from aar_api.services.audit import append as audit_append
 from aar_api.services.context_assets import (
     persist_drafts,
@@ -27,6 +30,11 @@ from aar_api.services.context_assets import (
 )
 
 router = APIRouter(prefix="/llm", tags=["llm"])
+
+# draft-analysis WRITES case.analysis and appends to the audit chain, so it is a
+# case write, not a read. classify-reason spends money on an external API.
+# Neither may be looser than reading the testimony they are built from.
+_analyst = Depends(require_role(Role.ADMIN, Role.MANAGER, Role.ANALYST))
 
 
 async def _persist_assets_if_any(
@@ -44,7 +52,9 @@ async def _persist_assets_if_any(
     await session.commit()
 
 
-@router.post("/classify-reason", response_model=ClassifyResponse)
+@router.post(
+    "/classify-reason", response_model=ClassifyResponse, dependencies=[_analyst]
+)
 async def classify_reason(
     payload: ClassifyRequest,
     session: AsyncSession = Depends(get_session),
@@ -67,9 +77,21 @@ async def classify_reason(
     return ClassifyResponse(**result.task_output.model_dump())
 
 
-@router.post("/cases/{case_id}/draft-analysis", response_model=DraftAnalysisResponse)
+@router.post(
+    "/cases/{case_id}/draft-analysis",
+    response_model=DraftAnalysisResponse,
+    dependencies=[_analyst],
+)
 async def draft_case_analysis(
-    case_id: int, session: AsyncSession = Depends(get_session)
+    case_id: int,
+    force: bool = Query(
+        default=False,
+        description=(
+            "Дозволити синтез без жодного поданого звіту — лише для кейсів, "
+            "де доказова база свідомо складається тільки з подій."
+        ),
+    ),
+    session: AsyncSession = Depends(get_session),
 ) -> DraftAnalysisResponse:
     case = await session.get(AARCase, case_id)
     if case is None:
@@ -94,11 +116,53 @@ async def draft_case_analysis(
     else:
         ev_summary = "Контекстні події не привʼязані до кейсу."
 
-    rep_rows = await session.scalars(
-        select(IndividualReport).where(IndividualReport.case_id == case_id)
+    # SUBMITTED ONLY. A requested-but-unanswered report is a stub whose six
+    # narrative columns are all NULL (created in aar.request_reports); feeding
+    # those to the model reads as "N participants reported nothing" rather than
+    # "N have not answered yet" — absence of evidence turned into evidence of
+    # absence. The idempotency skip-set already makes this distinction.
+    all_rows = list(
+        await session.scalars(
+            select(IndividualReport).where(IndividualReport.case_id == case_id)
+        )
     )
+    submitted_rows = [r for r in all_rows if r.submitted_at is not None]
+    pending_count = len(all_rows) - len(submitted_rows)
+
+    if not submitted_rows and not force:
+        # Refusing is the point: with no testimony the model would still emit a
+        # fluent "чому" from event counts alone, and it gets persisted with a
+        # model name and timestamp, then propagates into future mission briefs
+        # once the case is validated/closed. A plausible analysis is worse than
+        # an absent one. `force=true` stays available for cases whose evidence
+        # is genuinely events-only (e.g. T1/T4 triggers with no participants).
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"немає жодного поданого звіту учасника (очікується: {pending_count}). "
+                "Зберіть свідчення або повторіть із force=true, "
+                "якщо аналіз свідомо будується лише на подіях."
+            ),
+        )
+
+    # Passing `function` lets the model weigh crew vs engineering vs
+    # manufacturer testimony instead of reading one anonymous blob — which is
+    # the whole reason the function snapshot exists. But function is also
+    # identifying: with a single commander in a case it names the person. Reuse
+    # the SAME k>=2 within-case rule the API response uses, so the draft cannot
+    # de-anonymise someone the read path protects.
+    counts = redaction.function_counts(submitted_rows)
+
+    def _fn(r: IndividualReport) -> str | None:
+        if r.function is None:
+            return None
+        if r.anonymous and counts.get(r.function.value, 0) <= 1:
+            return None
+        return r.function.value
+
     reports = [
         {
+            "function": _fn(r),
             "what_happened": r.what_happened,
             "what_worked": r.what_worked,
             "what_failed": r.what_failed,
@@ -106,7 +170,7 @@ async def draft_case_analysis(
             "external_factors": r.external_factors,
             "what_to_change": r.what_to_change,
         }
-        for r in rep_rows
+        for r in submitted_rows
     ]
 
     try:
@@ -131,7 +195,16 @@ async def draft_case_analysis(
             action=AuditAction.CASE_ANALYSIS_DRAFTED,
             entity_type="aar_case",
             entity_id=case.id,
-            payload={"source": case.analysis_source, "via": "llm"},
+            payload={
+                "source": case.analysis_source,
+                "via": "llm",
+                # How much testimony the draft rested on, on the chain itself —
+                # so a later reader can tell an evidence-backed analysis from
+                # an events-only one without re-deriving it.
+                "reports_used": len(submitted_rows),
+                "reports_pending": pending_count,
+                "forced": force,
+            },
         )
 
     await _persist_assets_if_any(
@@ -139,7 +212,11 @@ async def draft_case_analysis(
     )
     await session.commit()
     await session.refresh(case)
-    return DraftAnalysisResponse(markdown=result.task_output)
+    return DraftAnalysisResponse(
+        markdown=result.task_output,
+        reports_used=len(submitted_rows),
+        reports_pending=pending_count,
+    )
 
 
 @router.get("/cases/{case_id}/analogies", response_model=AnalogyResponse)

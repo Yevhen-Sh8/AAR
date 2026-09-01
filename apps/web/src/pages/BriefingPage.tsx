@@ -10,6 +10,7 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
+import { METRIC } from "../lib/metrics";
 import { apiFetch, IS_DEMO } from "../lib/api";
 
 interface ProfileStats {
@@ -243,7 +244,7 @@ export default function BriefingPage() {
             </div>
             <div className="stat-row" style={{ marginTop: 0, paddingTop: 0, borderTop: 0 }}>
               <div className="stat-item">
-                <div className="stat-label">η (MSR)</div>
+                <div className="stat-label" title={METRIC.msr.hint}>{METRIC.msr.label}</div>
                 <div className="stat-value" style={{ color: "var(--accent-green)" }}>{msrPct}%</div>
               </div>
               <div className="stat-item">
@@ -256,7 +257,7 @@ export default function BriefingPage() {
                   {d.stats.lost}
                   {d.stats.lost_during_abort > 0 && (
                     <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                      {" "}(+{d.stats.lost_during_abort} під час абортів)
+                      {" "}(+{d.stats.lost_during_abort} під час зривів)
                     </span>
                   )}
                 </div>
@@ -266,7 +267,7 @@ export default function BriefingPage() {
                 <div className="stat-value" style={{ color: "var(--accent-gold)" }}>{d.stats.repaired}</div>
               </div>
               <div className="stat-item">
-                <div className="stat-label">Аборти</div>
+                <div className="stat-label">Зриви</div>
                 <div className="stat-value">{d.stats.aborted}</div>
               </div>
             </div>

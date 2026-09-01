@@ -18,6 +18,8 @@ import {
   ClipboardList,
   Map as MapIcon,
   Users,
+  Inbox,
+  ScrollText,
 } from "lucide-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { installAutoSync } from "./lib/sync";
@@ -45,6 +47,8 @@ const SignalsPage = lazy(() => import("./pages/SignalsPage"));
 const BriefingPage = lazy(() => import("./pages/BriefingPage"));
 const MapPage = lazy(() => import("./pages/MapPage"));
 const PeoplePage = lazy(() => import("./pages/PeoplePage"));
+const MyReportsPage = lazy(() => import("./pages/MyReportsPage"));
+const Mod440Page = lazy(() => import("./pages/Mod440Page"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -60,11 +64,13 @@ const NAV = [
   { section: "AAR" },
   { to: "/briefing", icon: ClipboardList, label: "Брифінг місії" },
   { to: "/signals", icon: Megaphone, label: "Сигнали (до завдання)" },
+  { to: "/my-reports", icon: Inbox, label: "Мої звіти" },
   { to: "/cases", icon: FolderKanban, label: "Кейси" },
   { to: "/context", icon: Library, label: "Контекст-активи" },
   { section: "Звіти" },
   { to: "/reports", icon: FileBarChart, label: "Звіти" },
   { to: "/learning-loop", icon: Activity, label: "Цикл навчання" },
+  { to: "/mod440", icon: ScrollText, label: "Форми №440" },
   { section: "Система" },
   { to: "/people", icon: Users, label: "Люди" },
   { to: "/dictionaries", icon: BookOpen, label: "Довідники" },
@@ -153,10 +159,12 @@ export default function App() {
               <Route path="/import" element={<ImportPage />} />
               <Route path="/briefing" element={<BriefingPage />} />
               <Route path="/signals" element={<SignalsPage />} />
+              <Route path="/my-reports" element={<MyReportsPage />} />
               <Route path="/cases" element={<CasesPage />} />
               <Route path="/context" element={<ContextPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/learning-loop" element={<LearningLoopPage />} />
+              <Route path="/mod440" element={<Mod440Page />} />
               <Route path="/people" element={<PeoplePage />} />
               <Route path="/dictionaries" element={<DictionariesPage />} />
               <Route path="/integrations" element={<IntegrationsPage />} />

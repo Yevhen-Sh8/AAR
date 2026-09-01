@@ -26,11 +26,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aar_api.models.aar import (
     AARCase,
     CaseStatus,
+    DecisionQuality,
     Recommendation,
     RecommendationStatus,
+    TriggerType,
 )
+from aar_api.models.context import AssetStatus, ContextAsset
 from aar_api.models.dictionaries import ItemType
 from aar_api.models.event import Item, Outcome, UsageEvent
+from aar_api.services import knowledge_aging as aging
 
 
 @dataclass(frozen=True)
@@ -52,6 +56,25 @@ class LoopKPI:
 
     # OPR load
     open_cases_by_opr: dict[str, int]
+
+    # Decision quality, judged apart from the outcome (ADR-024)
+    decision_quality_counts: dict[str, int]
+    # Cases tasked with remedial action while nobody had yet decided whether
+    # the decision — or the circumstances — were at fault.
+    endorsed_without_assessment: int
+    # Manual cases whose decision was NOT sound. A trigger only fires on a bad
+    # number, so these were opened by a human on a run that looked fine: the
+    # unit caught a bad call that happened to work out. Normally nobody
+    # records these, and the practice gets institutionalised because the
+    # result looked good.
+    caught_before_it_cost_anything: int
+
+    # Knowledge freshness (ADR-025). Validated assets still feeding the mission
+    # brief while overdue for re-confirmation — the brief speaking with more
+    # certainty than the knowledge behind it warrants.
+    stale_validated_assets: int
+    aging_validated_assets: int
+    fresh_validated_assets: int
 
     # Effectiveness denominators (literature insists on both)
     msr_narrow: float
@@ -179,6 +202,38 @@ async def compute_loop_kpi(
         if succ > 0:
             cost_per_effect[code] = float(total / succ)
 
+    quality_counts: dict[str, int] = {q.value: 0 for q in DecisionQuality}
+    for c in case_rows:
+        quality_counts[c.decision_quality.value] += 1
+
+    assessed_or_later = {
+        CaseStatus.ENDORSED,
+        CaseStatus.IMPLEMENTED,
+        CaseStatus.VALIDATED,
+        CaseStatus.CLOSED,
+    }
+    endorsed_without_assessment = sum(
+        1
+        for c in case_rows
+        if c.status in assessed_or_later
+        and c.decision_quality is DecisionQuality.UNASSESSED
+    )
+    caught_before_cost = sum(
+        1
+        for c in case_rows
+        if c.trigger is TriggerType.MANUAL
+        and c.decision_quality in {DecisionQuality.FLAWED, DecisionQuality.ACCEPTABLE}
+    )
+
+    validated_assets = list(
+        await session.scalars(
+            select(ContextAsset).where(ContextAsset.status == AssetStatus.VALIDATED)
+        )
+    )
+    freshness_tally = {aging.FRESH: 0, aging.AGING: 0, aging.STALE: 0}
+    for a in validated_assets:
+        freshness_tally[aging.freshness(a)] += 1
+
     return LoopKPI(
         time_to_validation_days_median=_percentile(ttv, 0.5),
         time_to_validation_days_p90=_percentile(ttv, 0.9),
@@ -190,6 +245,12 @@ async def compute_loop_kpi(
         regressed_recommendations=regressed_recs,
         validated_recommendations=validated_recs,
         open_cases_by_opr=dict(opr_load),
+        decision_quality_counts=quality_counts,
+        endorsed_without_assessment=endorsed_without_assessment,
+        caught_before_it_cost_anything=caught_before_cost,
+        stale_validated_assets=freshness_tally[aging.STALE],
+        aging_validated_assets=freshness_tally[aging.AGING],
+        fresh_validated_assets=freshness_tally[aging.FRESH],
         msr_narrow=round(msr_narrow, 4),
         msr_full=round(msr_full, 4),
         launched_count=launched,

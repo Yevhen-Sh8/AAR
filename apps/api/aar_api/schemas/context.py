@@ -42,6 +42,20 @@ class ContextAssetOut(BaseModel):
     usage_count: int
     created_at: datetime
 
+    # ADR-025 — derived, never stored. See services/knowledge_aging.py.
+    last_affirmed_at: datetime | None
+    affirmed_count: int
+    review_after_days: int | None
+    freshness: str
+    days_since_affirmed: int | None
+    half_life_days: int
+
+
+class ReviewWindowRequest(BaseModel):
+    """Override the category half-life for one asset (null → back to default)."""
+
+    review_after_days: int | None = Field(default=None, ge=1, le=3650)
+
 
 class RejectRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=512)

@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aar_api.core.db import get_session
@@ -27,6 +27,9 @@ from aar_api.schemas.aar import (
     CaseTransitionIn,
     IndividualReportIn,
     IndividualReportOut,
+    MyObservationOut,
+    MyObservationRecommendationOut,
+    MyReportRequestOut,
     RecommendationIn,
     RecommendationOut,
     RecommendationStatusUpdate,
@@ -50,6 +53,18 @@ router = APIRouter(prefix="/aar", tags=["aar"])
 # Participants must not read each other's testimony.
 _report_reader = Depends(require_role(Role.ADMIN, Role.MANAGER, Role.ANALYST))
 
+# SENSITIVITY ORDERING. Reading a colleague's testimony already requires
+# ANALYST; writing the official conclusion over it, moving the case along the
+# NATO cycle, or closing it must not require LESS. Until now those were open to
+# any authenticated caller, which inverted the ordering and let a participant
+# close a case out from under the auto-validation engine — the one mechanism
+# that proves the loop works.
+_case_writer = Depends(require_role(Role.ADMIN, Role.MANAGER, Role.ANALYST))
+
+# Endorsing, closing and running the trigger engine are command decisions and
+# operational jobs, not analysis.
+_case_owner = Depends(require_role(Role.ADMIN, Role.MANAGER))
+
 
 async def _get_case(session: AsyncSession, case_id: int) -> AARCase:
     case = await session.get(AARCase, case_id)
@@ -58,7 +73,10 @@ async def _get_case(session: AsyncSession, case_id: int) -> AARCase:
     return case
 
 
-@router.post("/cases", response_model=AARCaseOut, status_code=201)
+@router.post(
+    "/cases", response_model=AARCaseOut, status_code=201,
+    dependencies=[_case_writer],
+)
 async def create_case(
     payload: AARCaseIn, session: AsyncSession = Depends(get_session)
 ) -> AARCase:
@@ -112,7 +130,9 @@ async def get_case(case_id: int, session: AsyncSession = Depends(get_session)) -
     return await _get_case(session, case_id)
 
 
-@router.patch("/cases/{case_id}", response_model=AARCaseOut)
+@router.patch(
+    "/cases/{case_id}", response_model=AARCaseOut, dependencies=[_case_writer]
+)
 async def patch_case(
     case_id: int,
     payload: AARCasePatch,
@@ -141,7 +161,10 @@ async def patch_case(
     return case
 
 
-@router.post("/cases/{case_id}/transition", response_model=AARCaseOut)
+@router.post(
+    "/cases/{case_id}/transition", response_model=AARCaseOut,
+    dependencies=[_case_writer],
+)
 async def transition_case(
     case_id: int,
     payload: CaseTransitionIn,
@@ -188,7 +211,10 @@ async def transition_case(
     return case
 
 
-@router.post("/cases/{case_id}/close", response_model=AARCaseOut)
+@router.post(
+    "/cases/{case_id}/close", response_model=AARCaseOut,
+    dependencies=[_case_owner],
+)
 async def close_case(case_id: int, session: AsyncSession = Depends(get_session)) -> AARCase:
     """Legacy shortcut: jump directly to CLOSED. Prefer /transition for
     proper NATO-cycle tracking."""
@@ -213,6 +239,39 @@ async def close_case(case_id: int, session: AsyncSession = Depends(get_session))
     await session.commit()
     await session.refresh(case)
     return case
+
+
+def _speaking_for_another(claims: dict | None, subject_id: int | None) -> int | None:
+    """Authorise writing testimony under someone else's name; return the typist.
+
+    Testimony here is ATTRIBUTED. The audit chain names an originator, and
+    `/aar/my-observations` later shows that person «ось що вийшло з вашого
+    звіту». So putting words into a colleague's record is not a neutral act:
+    it forges an evidentiary entry in an append-only chain and hands the
+    consequences to someone who never said them.
+
+    Transcription on behalf of another IS a real workflow and stays allowed —
+    roster people deliberately have no account (`docs/QUICKSTART_ROLES.md`
+    §5.1), so a manager types up their paper report. It is simply privileged,
+    and the chain records WHO typed it separately from WHOSE testimony it is.
+
+    Returns the caller's uid when they are speaking for someone else (stored
+    as `transcribed_by`), or None when speaking for themselves or when the
+    caller cannot be identified.
+
+    `claims is None` means no token, which in production cannot happen on this
+    route — the global auth gate runs first. In development/tests the gate is
+    off and there is no caller to check, so the rule cannot apply.
+    """
+    caller_uid = (claims or {}).get("uid")
+    if not isinstance(caller_uid, int) or subject_id is None or caller_uid == subject_id:
+        return None
+    if not has_role(claims, Role.ADMIN, Role.MANAGER, Role.ANALYST):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="цей запит адресований іншій особі — подати звіт за неї не можна",
+        )
+    return caller_uid
 
 
 @router.post(
@@ -258,6 +317,11 @@ async def add_report(
         if payload.user_id is not None and payload.user_id != stub.requested_for_user_id:
             raise HTTPException(409, "user_id не відповідає адресату запиту")
         originator = payload.user_id or stub.requested_for_user_id
+        # ...and the check above only ever fired when the caller volunteered a
+        # `user_id`, which the participant UI never sends. Any logged-in
+        # participant could POST {request_id} at a colleague's stub and have
+        # the chain record the colleague as the author. Gate on the CALLER.
+        transcribed_by = _speaking_for_another(claims, stub.requested_for_user_id)
         snapshot_function = stub.function
         for k, v in data.items():
             if k == "function" and v is None:
@@ -266,8 +330,9 @@ async def add_report(
         if payload.function is not None:
             snapshot_function = payload.function
         stub.submitted_at = now
-        if payload.anonymous:
-            stub.user_id = None
+        # `user_id` is «who submitted». Leaving it null on a NON-anonymous
+        # report made every stub submission look anonymous at the row level.
+        stub.user_id = None if payload.anonymous else originator
         await session.flush()
         await _audit_report_submitted(
             session,
@@ -277,11 +342,15 @@ async def add_report(
             anonymous=payload.anonymous,
             originator_user_id=originator,
             function=snapshot_function,
+            transcribed_by=transcribed_by,
         )
         await session.commit()
         await session.refresh(stub)
         return redaction.report_out(stub, reveal=has_role(claims, Role.ADMIN))
 
+    # Same hole without a stub: POST {user_id: <colleague>} attributed a
+    # freshly-created report to them just as effectively.
+    transcribed_by = _speaking_for_another(claims, payload.user_id)
     report = IndividualReport(case_id=case_id, submitted_at=now, **data)
     if payload.anonymous:
         report.user_id = None
@@ -295,6 +364,7 @@ async def add_report(
         anonymous=payload.anonymous,
         originator_user_id=payload.user_id,
         function=payload.function,
+        transcribed_by=transcribed_by,
     )
     await session.commit()
     await session.refresh(report)
@@ -310,6 +380,7 @@ async def _audit_report_submitted(
     anonymous: bool,
     originator_user_id: int | None,
     function: ParticipantFunction | None,
+    transcribed_by: int | None = None,
 ) -> None:
     """BUG-2 fix: creating/filling a report is state-changing — record it.
 
@@ -332,6 +403,10 @@ async def _audit_report_submitted(
             "request_id": request_id,
             "anonymous": anonymous,
             "originator_user_id": originator_user_id,
+            # Set only when someone typed this up on the originator's behalf.
+            # Whose testimony it is and who entered it are different facts, and
+            # the chain must not conflate them.
+            "transcribed_by": transcribed_by,
             "function": function.value if function else None,
             "off_roster": row.off_roster,
         },
@@ -542,10 +617,34 @@ async def report_coverage(
     )
 
 
+@router.get("/cases/{case_id}/recommendations", response_model=list[RecommendationOut])
+async def list_recommendations(
+    case_id: int, session: AsyncSession = Depends(get_session)
+) -> list[Recommendation]:
+    """Recommendations of one case.
+
+    There was no list endpoint at all: recommendations could be created and
+    patched but never read back, so the IMPLEMENTED stage of the NATO cycle was
+    unreachable from any client. The only surface exposing them was
+    /aar/my-observations, which is keyed on the CALLER's own testimony — a
+    manager who never submitted a report in a case would see none of them, and
+    the manager is precisely who drives this stage.
+    """
+    await _get_case(session, case_id)
+    return list(
+        await session.scalars(
+            select(Recommendation)
+            .where(Recommendation.case_id == case_id)
+            .order_by(Recommendation.id)
+        )
+    )
+
+
 @router.post(
     "/cases/{case_id}/recommendations",
     response_model=RecommendationOut,
     status_code=201,
+    dependencies=[_case_writer],
 )
 async def add_recommendation(
     case_id: int,
@@ -571,6 +670,7 @@ async def add_recommendation(
 @router.patch(
     "/recommendations/{rec_id}",
     response_model=RecommendationOut,
+    dependencies=[_case_writer],
 )
 async def update_recommendation_status(
     rec_id: int,
@@ -598,7 +698,9 @@ async def update_recommendation_status(
     return rec
 
 
-@router.post("/run-triggers", response_model=TriggerResult)
+@router.post(
+    "/run-triggers", response_model=TriggerResult, dependencies=[_case_owner]
+)
 async def run_triggers(
     today: date = Query(default_factory=lambda: datetime.now(UTC).date()),
     session: AsyncSession = Depends(get_session),
@@ -613,3 +715,163 @@ async def run_triggers(
         auto_validated_recommendation_ids=auto_validated,
         regressed_recommendation_ids=regressed,
     )
+
+
+# ---------------------------------------------------------------------------
+# Participant-facing surface (Wave 12)
+# ---------------------------------------------------------------------------
+
+def _require_uid(claims: dict | None) -> int:
+    """Identity is mandatory here — these endpoints are "mine", not "all".
+
+    Deliberately uses optional_claims rather than require_role: require_role
+    short-circuits to ADMIN in development (which is also the test env) and
+    yields no uid, so reusing it would make "my reports" mean "everyone's".
+    """
+    uid = (claims or {}).get("uid")
+    if not isinstance(uid, int):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="потрібен вхід: ці дані персональні",
+        )
+    return uid
+
+
+def _outcome_phrase(case: AARCase, recs: list[Recommendation]) -> str:
+    """Say what came of the testimony, in the author's terms.
+
+    "Прийнято" is exactly the useless acknowledgement this endpoint exists to
+    replace, so every branch names a consequence instead.
+    """
+    validated = [r for r in recs if r.status == RecommendationStatus.VALIDATED]
+    if validated:
+        return (
+            f"Зміна впроваджена і підтверджена даними "
+            f"({len(validated)} з {len(recs)} рекомендацій)."
+        )
+    done = [r for r in recs if r.status == RecommendationStatus.DONE]
+    if done:
+        return f"Зміну впроваджено, очікує підтвердження даними ({len(done)})."
+    in_progress = [r for r in recs if r.status == RecommendationStatus.IN_PROGRESS]
+    if in_progress:
+        return f"За вашим звітом виконується зміна ({len(in_progress)})."
+    if recs:
+        return f"За вашим звітом запропоновано зміну ({len(recs)}), ще не почато."
+    if case.lesson_identified:
+        return "З вашого звіту сформульовано урок; конкретної зміни ще не призначено."
+    if case.analysis:
+        return "Ваш звіт увійшов в аналіз кейсу; урок ще не сформульовано."
+    return "Звіт отримано, розбір кейсу ще триває."
+
+
+@router.get("/my-report-requests", response_model=list[MyReportRequestOut])
+async def my_report_requests(
+    include_submitted: bool = Query(default=True),
+    session: AsyncSession = Depends(get_session),
+    claims: dict | None = Depends(optional_claims),
+) -> list[MyReportRequestOut]:
+    """What has been asked of ME.
+
+    Without this a participant is notified by webhook that a report is wanted
+    and then has no way to find out which case it concerns — the request lived
+    only in the manager's screen.
+    """
+    uid = _require_uid(claims)
+    stmt = (
+        select(IndividualReport, AARCase)
+        .join(AARCase, AARCase.id == IndividualReport.case_id)
+        .where(
+            or_(
+                IndividualReport.requested_for_user_id == uid,
+                IndividualReport.user_id == uid,
+            )
+        )
+        .order_by(IndividualReport.id.desc())
+    )
+    if not include_submitted:
+        stmt = stmt.where(IndividualReport.submitted_at.is_(None))
+    rows = (await session.execute(stmt)).all()
+    return [
+        MyReportRequestOut(
+            report_id=rep.id,
+            case_id=case.id,
+            case_title=case.title,
+            case_status=case.status,
+            requested_at=rep.requested_at,
+            submitted_at=rep.submitted_at,
+            anonymous=rep.anonymous,
+            function=rep.function,
+        )
+        for rep, case in rows
+    ]
+
+
+@router.get("/my-observations", response_model=list[MyObservationOut])
+async def my_observations(
+    session: AsyncSession = Depends(get_session),
+    claims: dict | None = Depends(optional_claims),
+) -> list[MyObservationOut]:
+    """What CAME OF my testimony — the loop back to the author.
+
+    ANONYMITY CAVEAT, stated rather than hidden: a report submitted anonymously
+    against a request stub is still findable here via requested_for_user_id
+    (redacted from everyone else, per services/redaction.py). A fully anonymous
+    report submitted with no stub has neither user_id nor requested_for_user_id
+    and is therefore untraceable BY DESIGN — including to its own author, who
+    consequently loses this feedback. That is the real price of unconditional
+    anonymity, not an oversight.
+    """
+    uid = _require_uid(claims)
+    rows = (
+        await session.execute(
+            select(IndividualReport, AARCase)
+            .join(AARCase, AARCase.id == IndividualReport.case_id)
+            .where(
+                IndividualReport.submitted_at.is_not(None),
+                or_(
+                    IndividualReport.user_id == uid,
+                    IndividualReport.requested_for_user_id == uid,
+                ),
+            )
+            .order_by(IndividualReport.submitted_at.desc())
+        )
+    ).all()
+    if not rows:
+        return []
+
+    case_ids = {case.id for _, case in rows}
+    rec_rows = list(
+        await session.scalars(
+            select(Recommendation).where(Recommendation.case_id.in_(case_ids))
+        )
+    )
+    by_case: dict[int, list[Recommendation]] = {}
+    for rec in rec_rows:
+        by_case.setdefault(rec.case_id, []).append(rec)
+
+    out: list[MyObservationOut] = []
+    for rep, case in rows:
+        recs = by_case.get(case.id, [])
+        out.append(
+            MyObservationOut(
+                report_id=rep.id,
+                case_id=case.id,
+                case_title=case.title,
+                case_status=case.status,
+                submitted_at=rep.submitted_at,
+                anonymous=rep.anonymous,
+                outcome_uk=_outcome_phrase(case, recs),
+                lesson_identified=case.lesson_identified,
+                recommendations=[
+                    MyObservationRecommendationOut(
+                        id=r.id,
+                        text=r.text,
+                        status=r.status,
+                        auto_validated_at=r.auto_validated_at,
+                        regressed_at=r.regressed_at,
+                    )
+                    for r in recs
+                ],
+            )
+        )
+    return out

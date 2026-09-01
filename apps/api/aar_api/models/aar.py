@@ -51,6 +51,32 @@ class TriggerType(StrEnum):
     ENTERPRISE_DROP = "enterprise_drop"  # T4: enterprise MSR drop d-o-d
 
 
+class DecisionQuality(StrEnum):
+    """Was the DECISION sound, judged on what was knowable at the time?
+
+    Deliberately ORTHOGONAL to the outcome. A sound call can end in a total
+    loss (the EW picture changed after launch); a reckless one can end in
+    success (the jamming happened to be down that hour). Grading a crew by
+    the outcome alone teaches them to fear luck instead of to think — the
+    failure NATO LLH4 and TC 25-20 both warn about.
+
+    The platform already draws this line at Level 1: the responsibility zone
+    separates «what the crew controlled» from «what happened to them», which
+    is why η_c exists at all. Level 2 had no equivalent — a case recorded what
+    happened and never said whether the decision behind it was defensible.
+    This closes that gap (ADR-024).
+
+    The valuable and normally unrecorded cell is FLAWED + good outcome: it
+    got away with it, nobody opens a case, and the unit institutionalises a
+    bad practice because the result looked fine.
+    """
+
+    UNASSESSED = "unassessed"
+    SOUND = "sound"  # right call on the information available at the time
+    ACCEPTABLE = "acceptable"  # defensible, though a better option existed
+    FLAWED = "flawed"  # wrong on information already in hand
+
+
 class RecommendationStatus(StrEnum):
     PROPOSED = "proposed"
     IN_PROGRESS = "in_progress"
@@ -81,6 +107,16 @@ class AARCase(Base):
     lesson_identified: Mapped[str | None] = mapped_column(Text, nullable=True)
     # opr = Office of Primary Responsibility (NATO LL endorse stage)
     opr: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    # Wave 13 (ADR-024): the decision, judged apart from how it turned out.
+    decision_quality: Mapped[DecisionQuality] = mapped_column(
+        Enum(DecisionQuality, native_enum=False, length=16),
+        default=DecisionQuality.UNASSESSED,
+        server_default=DecisionQuality.UNASSESSED.value,
+    )
+    # What was actually known at the moment of the decision. Without this the
+    # assessment is hindsight wearing a uniform.
+    decision_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Provenance of the analysis text — "llm:claude-sonnet-4-6", "manual", "edited" etc.
     analysis_source: Mapped[str | None] = mapped_column(String(64), nullable=True)

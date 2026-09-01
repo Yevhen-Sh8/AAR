@@ -101,3 +101,41 @@ async def test_monthly_xlsx_pdf() -> None:
         r = await client.get("/reports/monthly.pdf", params={"year": 2025, "month": 12})
         assert r.status_code == 200
         assert r.content[:4] == b"%PDF"
+
+
+async def test_monthly_xlsx_labels_are_readable_without_the_notation_doc() -> None:
+    """The printed report has to explain itself.
+
+    Column heads used to be bare `η_c (MSR_c)` — a symbol that appears nowhere
+    else in the product and was never defined on any screen. A monthly report
+    goes to a commander who has not read `docs/metrics.md`, so the head now
+    carries the Ukrainian name (notation kept in brackets for traceability) and
+    a «Позначення» block spells out every formula under the tables.
+    """
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    await _seed_two_months()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.get("/reports/monthly.xlsx", params={"year": 2025, "month": 12})
+        assert r.status_code == 200
+
+    ws = load_workbook(BytesIO(r.content)).active
+    assert ws is not None
+    text = "\n".join(
+        str(c.value) for row in ws.iter_rows() for c in row if c.value is not None
+    )
+
+    # Plain name first, notation only as a bracketed hint.
+    assert "Успішність, % (η)" in text
+    assert "Успішність обслуги, % (η_c)" in text
+    assert "Втрати обслуги, % (λ_c)" in text
+    assert "Зміна, в.п. (Δη)" in text
+
+    # And the legend that makes the sheet self-contained.
+    assert "Позначення" in text
+    assert "успішні ÷ запущені" in text
+    assert "85%" in text  # rating thresholds spelled out
+

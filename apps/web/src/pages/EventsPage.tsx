@@ -1,23 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../lib/api";
-
-interface UsageEvent {
-  id: number;
-  client_event_id: string | null;
-  item_id: number;
-  operator_id: number;
-  event_date: string;
-  outcome: string;
-  loss_reason_id: number | null;
-  repair_reason_id: number | null;
-  notes: string | null;
-  recorded_at: string;
-}
+import { OUTCOME_UK, outcomeBadge, type UsageEventRow } from "../lib/events";
 
 export default function EventsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["events"],
-    queryFn: () => apiFetch<UsageEvent[]>("/events?limit=50"),
+    queryFn: () => apiFetch<UsageEventRow[]>("/events?limit=50"),
     retry: 1,
   });
 
@@ -35,9 +23,12 @@ export default function EventsPage() {
             <tr>
               <th>#</th>
               <th>Дата</th>
-              <th>Item</th>
-              <th>Operator</th>
-              <th>Outcome</th>
+              {/* Was «Item» / «Operator» showing row ids — see lib/events.ts. */}
+              <th>Серійний №</th>
+              <th>Тип</th>
+              <th>Експлуатант</th>
+              <th>Результат</th>
+              <th>Причина</th>
               <th>Примітка</th>
             </tr>
           </thead>
@@ -46,23 +37,24 @@ export default function EventsPage() {
               <tr key={e.id}>
                 <td style={{ color: "var(--text-muted)" }}>{e.id}</td>
                 <td>{e.event_date}</td>
-                <td>#{e.item_id}</td>
-                <td>#{e.operator_id}</td>
+                <td className="mono">{e.item_serial_no}</td>
+                <td>{e.item_type_code}</td>
+                <td>{e.operator_code}</td>
                 <td>
-                  <span
-                    className={`card-badge ${
-                      e.outcome === "success"
-                        ? "badge-green"
-                        : e.outcome === "lost"
-                          ? "badge-red"
-                          : "badge-gold"
-                    }`}
-                  >
-                    {e.outcome}
+                  <span className={`card-badge ${outcomeBadge(e.outcome)}`}>
+                    {OUTCOME_UK[e.outcome]}
                   </span>
+                  {e.aborted && (
+                    <span className="card-badge badge-gold" style={{ marginLeft: 4 }}>
+                      зрив
+                    </span>
+                  )}
+                </td>
+                <td className="mono" style={{ fontSize: 12 }}>
+                  {e.loss_reason_code ?? e.repair_reason_code ?? "—"}
                 </td>
                 <td style={{ color: "var(--text-secondary)", fontSize: 12 }}>
-                  {e.notes || "—"}
+                  {e.notes || e.abort_reason || "—"}
                 </td>
               </tr>
             ))}
