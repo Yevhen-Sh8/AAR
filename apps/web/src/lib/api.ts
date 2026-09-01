@@ -55,6 +55,7 @@ const MOCK_ROUTES: Record<string, string> = {
   "/dictionaries/loss-reasons": "/loss-reasons.json",
   "/dictionaries/repair-reasons": "/repair-reasons.json",
   "/dictionaries/item-types": "/item-types.json",
+  "/learning/response-diversity": "/response-diversity.json",
   "/audit/log": "/audit-log.json",
   "/audit/verify": "/audit-verify.json",
   "/context/assets": "/context-assets.json",

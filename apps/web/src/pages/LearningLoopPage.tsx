@@ -65,6 +65,25 @@ function MetaCard({
   );
 }
 
+interface ResponsePattern {
+  operator_code: string | null;
+  trigger: string;
+  cases: number;
+  recommendations: number;
+  distinct_responses: number;
+  dominant_text: string;
+  dominant_count: number;
+  dominant_share: number;
+}
+
+const TRIGGER_UK: Record<string, string> = {
+  msr_drop: "падіння успішності",
+  repeated_reason: "повтор причини",
+  item_anomaly: "аномалія виробу",
+  enterprise_drop: "падіння по підприємству",
+  manual: "відкрито вручну",
+};
+
 export default function LearningLoopPage() {
   const kpi = useQuery({
     queryKey: ["loop-kpi"],
@@ -134,6 +153,8 @@ export default function LearningLoopPage() {
           note={`${Object.values(d.open_cases_by_opr).reduce((a, b) => a + b, 0)} відкритих кейсів`}
         />
       </div>
+
+      <ResponseDiversityCard />
 
       <div className="dashboard-grid">
         <div className="card">
@@ -366,6 +387,92 @@ export default function LearningLoopPage() {
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Where the remedial answer never changes (ADR-026).
+ *
+ * Reports the repetition and stops there. Whether it has made the unit
+ * readable to an adversary depends on the operational picture, which the
+ * reader has and this screen does not — so the screen states the fact and
+ * leaves the conclusion where it belongs.
+ */
+function ResponseDiversityCard() {
+  const q = useQuery({
+    queryKey: ["response-diversity"],
+    queryFn: () => apiFetch<ResponsePattern[]>("/learning/response-diversity"),
+  });
+  const rows = q.data ?? [];
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Однакова відповідь на однакову ситуацію</span>
+        <span className={`card-badge ${rows.length > 0 ? "badge-gold" : "badge-green"}`}>
+          {rows.length} закономірностей
+        </span>
+      </div>
+
+      {q.isLoading && <div className="loading">Завантаження…</div>}
+      {q.isError && <div className="error-msg">Не вдалося порахувати.</div>}
+
+      {!q.isLoading && !q.isError && rows.length === 0 && (
+        <div className="loading">
+          Жодного тригера, на який відповідають однією й тією ж дією тричі
+          поспіль. Реакція різноманітна.
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Експлуатант</th>
+              <th>Тригер</th>
+              <th>Кейсів</th>
+              <th>Різних відповідей</th>
+              <th>Повторювана дія</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => (
+              <tr key={`${p.operator_code}-${p.trigger}`}>
+                <td className="mono">{p.operator_code ?? "—"}</td>
+                <td>{TRIGGER_UK[p.trigger] ?? p.trigger}</td>
+                <td>{p.cases}</td>
+                <td
+                  style={{
+                    fontWeight: 600,
+                    color: p.distinct_responses === 1 ? "var(--accent-red)" : undefined,
+                  }}
+                >
+                  {p.distinct_responses}
+                </td>
+                <td style={{ fontSize: 12 }}>
+                  «{p.dominant_text}»{" "}
+                  <span style={{ color: "var(--text-muted)" }}>
+                    — {p.dominant_count} з {p.recommendations}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+        Тут показано <strong>факт повторення</strong>: на цей тригер у цього
+        експлуатанта раз за разом призначають ту саму дію. Чи означає це, що
+        поведінку підрозділу вже можна передбачити ззовні — вирішувати вам:
+        це залежить від обстановки, якої система не знає.
+        <br />
+        Не плутати з «recurrence rate»: той показує, що <em>виправлення не
+        спрацювало</em> і проблема повернулась. Цей — що <em>відповідь
+        не змінюється</em>. Рекомендація може бути цілком дієвою й водночас
+        цілком передбачуваною.
+      </p>
     </div>
   );
 }
