@@ -2,7 +2,12 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from aar_api.models.aar import CaseStatus, RecommendationStatus, TriggerType
+from aar_api.models.aar import (
+    CaseStatus,
+    DecisionQuality,
+    RecommendationStatus,
+    TriggerType,
+)
 from aar_api.models.user import ParticipantFunction
 
 
@@ -32,6 +37,8 @@ class AARCasePatch(BaseModel):
     analysis: str | None = None
     lesson_identified: str | None = None
     opr: str | None = None
+    decision_quality: DecisionQuality | None = None
+    decision_rationale: str | None = None
 
 
 class CaseTransitionIn(BaseModel):
@@ -54,6 +61,8 @@ class AARCaseOut(_Base):
     analysis: str | None
     lesson_identified: str | None
     opr: str | None
+    decision_quality: DecisionQuality
+    decision_rationale: str | None
     analysis_source: str | None
     analysis_drafted_at: datetime | None
     opened_at: datetime

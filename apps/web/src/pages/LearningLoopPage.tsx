@@ -11,6 +11,9 @@ interface LoopKPI {
   cases_analysed_or_later: number;
   cases_validated_or_closed: number;
   recurrence_rate_pct: number;
+  decision_quality_counts: Record<string, number>;
+  endorsed_without_assessment: number;
+  caught_before_it_cost_anything: number;
   regressed_recommendations: number;
   validated_recommendations: number;
   open_cases_by_opr: Record<string, number>;
@@ -130,6 +133,70 @@ export default function LearningLoopPage() {
       </div>
 
       <div className="dashboard-grid">
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Якість рішень — окремо від наслідків</span>
+            <span className="card-badge badge-blue">
+              {Object.values(d.decision_quality_counts).reduce((a, b) => a + b, 0)} кейсів
+            </span>
+          </div>
+          <table className="data-table">
+            <tbody>
+              {[
+                ["sound", "Правильне рішення", "var(--accent-green)"],
+                ["acceptable", "Прийнятне, був кращий варіант", "var(--accent-gold)"],
+                ["flawed", "Хибне рішення", "var(--accent-red)"],
+                ["unassessed", "Не оцінено", "var(--text-muted)"],
+              ].map(([k, label, color]) => (
+                <tr key={k}>
+                  <td>{label}</td>
+                  <td style={{ textAlign: "right", fontWeight: 600, color }}>
+                    {d.decision_quality_counts[k] ?? 0}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="stat-row" style={{ marginTop: 12 }}>
+            <div className="stat-item">
+              <div
+                className="stat-label"
+                title="Кейси, доведені до стадії «призначено відповідального» і далі, у яких рішення так і не оцінене."
+              >
+                Виправляють, не оцінивши
+              </div>
+              <div
+                className="stat-value"
+                style={{
+                  color: d.endorsed_without_assessment > 0 ? "var(--accent-red)" : undefined,
+                }}
+              >
+                {d.endorsed_without_assessment}
+              </div>
+            </div>
+            <div className="stat-item">
+              <div
+                className="stat-label"
+                title="Кейси, відкриті людиною (не тригером) із хибним або лише прийнятним рішенням: показники були нормальні, ризик помітили самі."
+              >
+                Спіймано до наслідків
+              </div>
+              <div className="stat-value" style={{ color: "var(--accent-green)" }}>
+                {d.caught_before_it_cost_anything}
+              </div>
+            </div>
+          </div>
+
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+            Рішення оцінюється за тим, що було відомо на той момент, — не за тим,
+            чим усе скінчилось. Правильне рішення може закінчитись втратою,
+            хибне — успіхом. «Виправляють, не оцінивши» означає, що підрозділу
+            призначили зміну, не з'ясувавши, винне рішення чи обставини: так
+            тренуються проти невдачі, а не проти помилки.
+          </p>
+        </div>
+
         <div className="card">
           <div className="card-header">
             <span className="card-title">Успішність за двома знаменниками</span>

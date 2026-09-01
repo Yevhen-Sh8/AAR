@@ -29,6 +29,10 @@ class LoopKPIOut(BaseModel):
 
     open_cases_by_opr: dict[str, int]
 
+    decision_quality_counts: dict[str, int]
+    endorsed_without_assessment: int
+    caught_before_it_cost_anything: int
+
     msr_narrow: float
     msr_full: float
     launched_count: int

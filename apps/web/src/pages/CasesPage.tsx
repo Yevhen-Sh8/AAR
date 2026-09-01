@@ -17,6 +17,22 @@ import { apiFetch, IS_DEMO } from "../lib/api";
 import ParticipantPicker from "../components/ParticipantPicker";
 import { FUNCTION_ORDER, functionLabel, type ParticipantFunction } from "../lib/people";
 
+/** Mirrors aar_api.models.aar.DecisionQuality (ADR-024). */
+type DecisionQuality = "unassessed" | "sound" | "acceptable" | "flawed";
+
+const DECISION_LABELS: Record<DecisionQuality, string> = {
+  unassessed: "не оцінено",
+  sound: "правильне рішення",
+  acceptable: "прийнятне, але був кращий варіант",
+  flawed: "хибне рішення",
+};
+
+const DECISION_HINT =
+  "Оцінюється РІШЕННЯ на підставі того, що було відомо на той момент, — " +
+  "окремо від того, чим усе скінчилось. Правильне рішення може закінчитись " +
+  "втратою (обстановка змінилась після пуску), хибне — успіхом (РЕБ того дня " +
+  "не працював). Оцінка за наслідком вчить боятися випадковості, а не думати.";
+
 interface AARCase {
   id: number;
   title: string;
@@ -29,6 +45,8 @@ interface AARCase {
   analysis: string | null;
   lesson_identified: string | null;
   opr: string | null;
+  decision_quality: DecisionQuality;
+  decision_rationale: string | null;
   analysis_source: string | null;
   analysis_drafted_at: string | null;
   opened_at: string;
@@ -667,6 +685,31 @@ export default function CasesPage() {
                 rows={3}
                 value={value("lesson_identified")}
                 onChange={(e) => setDraft({ ...draft, lesson_identified: e.target.value })}
+              />
+            </label>
+            <label>
+              Якість рішення
+              <select
+                className="form-input"
+                value={(draft.decision_quality ?? current.decision_quality) as string}
+                onChange={(e) =>
+                  setDraft({ ...draft, decision_quality: e.target.value as DecisionQuality })
+                }
+              >
+                {(Object.keys(DECISION_LABELS) as DecisionQuality[]).map((q) => (
+                  <option key={q} value={q}>{DECISION_LABELS[q]}</option>
+                ))}
+              </select>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{DECISION_HINT}</span>
+            </label>
+            <label>
+              Що було відомо на момент рішення
+              <textarea
+                className="form-input"
+                rows={2}
+                value={value("decision_rationale")}
+                onChange={(e) => setDraft({ ...draft, decision_rationale: e.target.value })}
+                placeholder="без цього оцінка — це заднім числом"
               />
             </label>
             <label>

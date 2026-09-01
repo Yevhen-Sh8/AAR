@@ -26,8 +26,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aar_api.models.aar import (
     AARCase,
     CaseStatus,
+    DecisionQuality,
     Recommendation,
     RecommendationStatus,
+    TriggerType,
 )
 from aar_api.models.dictionaries import ItemType
 from aar_api.models.event import Item, Outcome, UsageEvent
@@ -52,6 +54,18 @@ class LoopKPI:
 
     # OPR load
     open_cases_by_opr: dict[str, int]
+
+    # Decision quality, judged apart from the outcome (ADR-024)
+    decision_quality_counts: dict[str, int]
+    # Cases tasked with remedial action while nobody had yet decided whether
+    # the decision — or the circumstances — were at fault.
+    endorsed_without_assessment: int
+    # Manual cases whose decision was NOT sound. A trigger only fires on a bad
+    # number, so these were opened by a human on a run that looked fine: the
+    # unit caught a bad call that happened to work out. Normally nobody
+    # records these, and the practice gets institutionalised because the
+    # result looked good.
+    caught_before_it_cost_anything: int
 
     # Effectiveness denominators (literature insists on both)
     msr_narrow: float
@@ -179,6 +193,29 @@ async def compute_loop_kpi(
         if succ > 0:
             cost_per_effect[code] = float(total / succ)
 
+    quality_counts: dict[str, int] = {q.value: 0 for q in DecisionQuality}
+    for c in case_rows:
+        quality_counts[c.decision_quality.value] += 1
+
+    assessed_or_later = {
+        CaseStatus.ENDORSED,
+        CaseStatus.IMPLEMENTED,
+        CaseStatus.VALIDATED,
+        CaseStatus.CLOSED,
+    }
+    endorsed_without_assessment = sum(
+        1
+        for c in case_rows
+        if c.status in assessed_or_later
+        and c.decision_quality is DecisionQuality.UNASSESSED
+    )
+    caught_before_cost = sum(
+        1
+        for c in case_rows
+        if c.trigger is TriggerType.MANUAL
+        and c.decision_quality in {DecisionQuality.FLAWED, DecisionQuality.ACCEPTABLE}
+    )
+
     return LoopKPI(
         time_to_validation_days_median=_percentile(ttv, 0.5),
         time_to_validation_days_p90=_percentile(ttv, 0.9),
@@ -190,6 +227,9 @@ async def compute_loop_kpi(
         regressed_recommendations=regressed_recs,
         validated_recommendations=validated_recs,
         open_cases_by_opr=dict(opr_load),
+        decision_quality_counts=quality_counts,
+        endorsed_without_assessment=endorsed_without_assessment,
+        caught_before_it_cost_anything=caught_before_cost,
         msr_narrow=round(msr_narrow, 4),
         msr_full=round(msr_full, 4),
         launched_count=launched,
