@@ -31,6 +31,32 @@ class UsageEventIn(BaseModel):
         return self
 
 
+class UsageEventListOut(BaseModel):
+    """A listed event, with the codes a human reads instead of foreign keys.
+
+    `UsageEventOut` answers the write path, where the client only needs the id
+    back. The list is different: this is a PER-SERIAL-NUMBER tracking system,
+    and its event list used to render «#24 · #10» — the item and operator row
+    ids. Nobody can pick the loss they need to write an act for out of that,
+    and the serial number is the whole point of the product.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    client_event_id: str | None
+    event_date: date
+    outcome: Outcome
+    item_serial_no: str
+    item_type_code: str
+    operator_code: str
+    loss_reason_code: str | None
+    repair_reason_code: str | None
+    notes: str | None
+    aborted: bool
+    abort_reason: str | None
+    recorded_at: datetime
+
+
 class UsageEventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
