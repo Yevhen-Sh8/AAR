@@ -224,7 +224,9 @@ async def evaluate_triggers(
         )
 
     # Monitor & Validate — close the NATO LL loop.
-    auto_validated, regressed = await auto_validate_recommendations(
+    # `escalated` is a subset of `regressed`; each one already wrote its own
+    # RECOMMENDATION_ESCALATED entry to the chain, so it needs no summary row.
+    auto_validated, regressed, _escalated = await auto_validate_recommendations(
         session, today, fired_signatures, ValidationConfig()
     )
     return created, skipped, auto_validated, regressed

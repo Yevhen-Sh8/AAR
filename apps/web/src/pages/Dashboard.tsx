@@ -28,6 +28,9 @@ interface Rating {
   msr_c: number;
   category: string;
   rank: number;
+  sorties: number;
+  cleaned_denominator: number;
+  sample_sufficient: boolean;
 }
 
 interface ZoneSummary {
@@ -248,6 +251,8 @@ export default function Dashboard() {
               name: r.operator_code,
               msr_c: r.msr_c,
               category: r.category,
+              sorties: r.sorties,
+              sample_sufficient: r.sample_sufficient,
             }))}
           />
         ) : (

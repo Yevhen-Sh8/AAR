@@ -21,6 +21,12 @@ from aar_api.schemas.monthly import (
 HIGH_THRESHOLD = 0.85
 OK_THRESHOLD = 0.70
 
+#: Sorties below which a readiness verdict is not supportable (ADR-027).
+#: A policy constant, not a statistical result — stated so it can be argued
+#: with. One bad sortie out of three reads as 67% and lands the operator in
+#: «потребує до-підготовки» beside a unit measured over two hundred flights.
+MIN_SORTIES_FOR_VERDICT = 10
+
 
 def _month_bounds(year: int, month: int) -> tuple[date, date]:
     return date(year, month, 1), date(year, month, monthrange(year, month)[1])
@@ -30,7 +36,16 @@ def _prev_month(year: int, month: int) -> tuple[int, int]:
     return (year - 1, 12) if month == 1 else (year, month - 1)
 
 
-def _category(msr_c: float) -> str:
+def _category(msr_c: float, sorties: int) -> str:
+    """Readiness bucket — or an explicit refusal to issue one.
+
+    The rating goes to a commander and drives training decisions about real
+    people. Handing back «needs_training» computed from three sorties, in the
+    same column as one computed from three hundred, states a conclusion the
+    data cannot carry. Below the floor we say so instead of guessing.
+    """
+    if sorties < MIN_SORTIES_FOR_VERDICT:
+        return "insufficient_data"
     if msr_c >= HIGH_THRESHOLD:
         return "high"
     if msr_c >= OK_THRESHOLD:
@@ -166,10 +181,21 @@ async def build_monthly_report(session: AsyncSession, year: int, month: int) -> 
         cleaned = c["launched"] - c["lost_external"] - c["lost_mfg"]
         msr_c = _round(c["success"] / cleaned) if cleaned else 0.0
         rating_rows.append(
-            OperatorRating(operator_code=op_code, msr_c=msr_c,
-                           category=_category(msr_c), rank=0)
+            OperatorRating(
+                operator_code=op_code,
+                msr_c=msr_c,
+                category=_category(msr_c, c["launched"]),
+                rank=0,
+                # The denominators travel WITH the number. A rate without its
+                # sample size is an assertion, not a measurement (ADR-027).
+                sorties=c["launched"],
+                cleaned_denominator=cleaned,
+                sample_sufficient=c["launched"] >= MIN_SORTIES_FOR_VERDICT,
+            )
         )
-    rating_rows.sort(key=lambda r: (-r.msr_c, r.operator_code))
+    # Operators without a supportable verdict rank last regardless of their
+    # arithmetic: a 100% built on two flights must not top the table.
+    rating_rows.sort(key=lambda r: (not r.sample_sufficient, -r.msr_c, r.operator_code))
     for i, row in enumerate(rating_rows, start=1):
         row.rank = i
 

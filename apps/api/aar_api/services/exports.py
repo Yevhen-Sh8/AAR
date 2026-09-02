@@ -30,6 +30,19 @@ LEGEND_CLR = (
     "Втрати обслуги (λ_c, CLR) = втрати й ремонти із зоною «обслуга» ÷ запущені."
 )
 LEGEND_DELTA = "Зміна (Δη) — різниця успішності з попереднім періодом, у відсоткових пунктах."
+LEGEND_SAMPLE = (
+    "«Запусків» — скільки застосувань стоїть за числом. Менш ніж 10 запусків не "
+    "дають підстав для висновку про готовність: категорія тоді — «замало даних»."
+)
+
+#: Readiness buckets in Ukrainian. The raw enum used to be printed verbatim
+#: into a document going to a commander.
+CATEGORY_UK = {
+    "high": "висока готовність",
+    "ok": "задовільна",
+    "needs_training": "потребує до-підготовки",
+    "insufficient_data": "замало даних для висновку",
+}
 
 
 def daily_report_to_xlsx(report: DailyReport) -> bytes:
@@ -198,11 +211,11 @@ def monthly_report_to_xlsx(report: MonthlyReport) -> bytes:
     ws.append([])
     ws.append(["Рейтинг експлуатантів за успішністю обслуги (η_c)"])
     ws.cell(row=ws.max_row, column=1).font = bold
-    ws.append(["Місце", "Експлуатант", H_MSR_C, "Категорія"])
+    ws.append(["Місце", "Експлуатант", H_MSR_C, "Запусків", "Категорія"])
     for c in ws[ws.max_row]:
         c.font = bold
     for rt in report.rating:
-        ws.append([rt.rank, rt.operator_code, rt.msr_c, rt.category])
+        ws.append([rt.rank, rt.operator_code, rt.msr_c, rt.sorties, CATEGORY_UK[rt.category]])
 
     ws.append([])
     ws.append(["Т.7. Зони відповідальності"])
@@ -229,7 +242,7 @@ def monthly_report_to_xlsx(report: MonthlyReport) -> bytes:
     ws.append([])
     ws.append(["Позначення"])
     ws.cell(row=ws.max_row, column=1).font = bold
-    for line in (LEGEND_MSR, LEGEND_MSR_C, LEGEND_CLR, LEGEND_DELTA):
+    for line in (LEGEND_MSR, LEGEND_MSR_C, LEGEND_CLR, LEGEND_DELTA, LEGEND_SAMPLE):
         ws.append([line])
 
     buf = BytesIO()
@@ -266,13 +279,17 @@ def monthly_report_to_pdf(report: MonthlyReport) -> bytes:
     story.append(Spacer(1, 6))
     story.extend(
         Paragraph(line, styles["BodyText"])
-        for line in (LEGEND_MSR, LEGEND_MSR_C, LEGEND_CLR, LEGEND_DELTA)
+        for line in (LEGEND_MSR, LEGEND_MSR_C, LEGEND_CLR, LEGEND_DELTA, LEGEND_SAMPLE)
     )
 
     story.extend([Spacer(1, 12), Paragraph("Рейтинг експлуатантів", styles["Heading2"])])
-    rating: list[list[object]] = [["Місце", "Експлуатант", "Успішність обслуги, %", "Категорія"]]
-    rating.extend([r.rank, r.operator_code, f"{r.msr_c:.2%}", r.category]
-                  for r in report.rating)
+    rating: list[list[object]] = [
+        ["Місце", "Експлуатант", "Успішність обслуги, %", "Запусків", "Категорія"]
+    ]
+    rating.extend(
+        [r.rank, r.operator_code, f"{r.msr_c:.2%}", r.sorties, CATEGORY_UK[r.category]]
+        for r in report.rating
+    )
     story.append(_table(rating))
 
     story.extend([Spacer(1, 12), Paragraph("Т.7. Зони відповідальності", styles["Heading2"])])

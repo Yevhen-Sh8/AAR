@@ -69,7 +69,13 @@ async def test_monthly_msr_c_and_trend() -> None:
         assert abs(rows["E-01"]["delta_msr_pp"] - 25.0) < 0.01
 
         rating = {r["operator_code"]: r for r in body["rating"]}
-        assert rating["E-01"]["category"] == "high"
+        # ADR-027: five sorties cannot carry a readiness verdict, however good
+        # the arithmetic looks. This assertion used to read `== "high"`, which
+        # is exactly the over-claim the floor exists to stop.
+        assert rating["E-01"]["category"] == "insufficient_data"
+        assert rating["E-01"]["sample_sufficient"] is False
+        assert rating["E-01"]["sorties"] == 5
+        assert rating["E-01"]["msr_c"] == 1.0
         assert rating["E-01"]["rank"] == 1
 
         trends = {t["operator_code"]: t for t in body["trends"]}
@@ -139,3 +145,72 @@ async def test_monthly_xlsx_labels_are_readable_without_the_notation_doc() -> No
     assert "успішні ÷ запущені" in text
     assert "85%" in text  # rating thresholds spelled out
 
+
+
+
+async def test_a_verdict_appears_once_there_are_enough_sorties() -> None:
+    """The floor withholds the category, it does not withhold the number."""
+    Session = async_sessionmaker(_engine, expire_on_commit=False)
+    async with Session() as s:
+        a = ItemType(code="A", name_uk="A")
+        op = Operator(code="E-09", name_uk="09")
+        s.add_all([a, op])
+        await s.flush()
+        items = [Item(serial_no=f"B-{i:05d}", item_type_id=a.id) for i in range(12)]
+        s.add_all(items)
+        await s.flush()
+        for i in range(12):
+            s.add(
+                UsageEvent(
+                    item_id=items[i].id,
+                    operator_id=op.id,
+                    event_date=date(2025, 12, 15),
+                    outcome=Outcome.SUCCESS,
+                )
+            )
+        await s.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        body = (
+            await client.get("/reports/monthly", params={"year": 2025, "month": 12})
+        ).json()
+
+    row = {r["operator_code"]: r for r in body["rating"]}["E-09"]
+    assert row["sorties"] == 12
+    assert row["sample_sufficient"] is True
+    assert row["category"] == "high"
+
+
+async def test_a_thin_sample_never_tops_the_table() -> None:
+    """A 100% built on two flights must not outrank a measured operator."""
+    Session = async_sessionmaker(_engine, expire_on_commit=False)
+    async with Session() as s:
+        a = ItemType(code="A", name_uk="A")
+        thin = Operator(code="E-THIN", name_uk="thin")
+        solid = Operator(code="E-SOLID", name_uk="solid")
+        s.add_all([a, thin, solid])
+        await s.flush()
+        items = [Item(serial_no=f"C-{i:05d}", item_type_id=a.id) for i in range(14)]
+        s.add_all(items)
+        await s.flush()
+        # Two perfect flights…
+        for i in range(2):
+            s.add(UsageEvent(item_id=items[i].id, operator_id=thin.id,
+                             event_date=date(2025, 12, 15), outcome=Outcome.SUCCESS))
+        # …against twelve, one of which failed.
+        for i in range(2, 13):
+            s.add(UsageEvent(item_id=items[i].id, operator_id=solid.id,
+                             event_date=date(2025, 12, 15), outcome=Outcome.SUCCESS))
+        s.add(UsageEvent(item_id=items[13].id, operator_id=solid.id,
+                         event_date=date(2025, 12, 15), outcome=Outcome.REPAIR))
+        await s.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        body = (
+            await client.get("/reports/monthly", params={"year": 2025, "month": 12})
+        ).json()
+
+    ranks = {r["operator_code"]: r["rank"] for r in body["rating"]}
+    assert ranks["E-SOLID"] < ranks["E-THIN"]
