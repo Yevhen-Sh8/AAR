@@ -1,0 +1,46 @@
+[
+  {
+    "id": 501,
+    "case_id": 26,
+    "text": "Ввести передпольотну перевірку каналу звʼязку",
+    "status": "validated",
+    "validated_at": "2026-06-20T10:00:00Z",
+    "auto_validated_at": "2026-06-20T10:00:00Z",
+    "regressed_at": null,
+    "evidence_count": 14,
+    "signature": "T2:loss:reb:2026-06-01"
+  },
+  {
+    "id": 502,
+    "case_id": 26,
+    "text": "Змінити маршрут виходу з зони ураження",
+    "status": "in_progress",
+    "validated_at": null,
+    "auto_validated_at": null,
+    "regressed_at": null,
+    "evidence_count": 0,
+    "signature": null
+  },
+  {
+    "id": 503,
+    "case_id": 26,
+    "text": "Подвоїти контроль заряду перед вильотом",
+    "status": "done",
+    "validated_at": null,
+    "auto_validated_at": null,
+    "regressed_at": "2026-07-02T08:30:00Z",
+    "evidence_count": 3,
+    "signature": "T3:A-00142:2026-06-15"
+  },
+  {
+    "id": 504,
+    "case_id": 26,
+    "text": "Узгодити частоти з суміжниками",
+    "status": "proposed",
+    "validated_at": null,
+    "auto_validated_at": null,
+    "regressed_at": null,
+    "evidence_count": 0,
+    "signature": null
+  }
+]

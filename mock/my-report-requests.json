@@ -1,0 +1,22 @@
+[
+  {
+    "report_id": 312,
+    "case_id": 47,
+    "case_title": "Втрата 3 бортів у секторі «Дуб» за одну добу",
+    "case_status": "open",
+    "requested_at": "2026-07-28T09:15:00Z",
+    "submitted_at": null,
+    "anonymous": false,
+    "function": "crew"
+  },
+  {
+    "report_id": 318,
+    "case_id": 51,
+    "case_title": "Повторний збій підвісу після заміни рами",
+    "case_status": "analysed",
+    "requested_at": "2026-07-31T14:02:00Z",
+    "submitted_at": null,
+    "anonymous": false,
+    "function": "engineering"
+  }
+]

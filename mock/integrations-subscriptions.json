@@ -1,0 +1,48 @@
+[
+  {
+    "id": 1,
+    "name": "delta-situational-awareness",
+    "kind": "delta",
+    "target_url": "https://delta.mil.gov.ua/api/v1/hooks/aar",
+    "events": [
+      "usage_event.created",
+      "aar_case.created"
+    ],
+    "active": true,
+    "created_at": "2026-04-12T10:00:00Z"
+  },
+  {
+    "id": 2,
+    "name": "kropyva-mapping",
+    "kind": "kropyva",
+    "target_url": "https://kropyva.local/api/feature-import",
+    "events": [
+      "usage_event.created"
+    ],
+    "active": true,
+    "created_at": "2026-04-18T09:30:00Z"
+  },
+  {
+    "id": 3,
+    "name": "sap-erp-export",
+    "kind": "sap",
+    "target_url": "https://sap.enterprise.local/restful/aar-events",
+    "events": [
+      "usage_event.created"
+    ],
+    "active": true,
+    "created_at": "2026-05-01T14:00:00Z"
+  },
+  {
+    "id": 4,
+    "name": "odin-c2-prod",
+    "kind": "odin",
+    "target_url": "https://odin.local/api/inbound/aar",
+    "events": [
+      "aar_case.created",
+      "aar_case.closed"
+    ],
+    "active": false,
+    "created_at": "2026-05-20T16:15:00Z"
+  }
+]

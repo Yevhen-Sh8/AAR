@@ -1,0 +1,30 @@
+{
+  "kinds": [
+    "generic",
+    "odin",
+    "delta",
+    "kropyva",
+    "sap",
+    "telegram"
+  ],
+  "events": [
+    "aar_case.closed",
+    "aar_case.created",
+    "aar_case.transitioned",
+    "individual_report.requested",
+    "recommendation.auto_validated",
+    "signal.created",
+    "usage_event.created"
+  ],
+  "excluded": [
+    "oberig"
+  ],
+  "notes": {
+    "delta": "Огортає подію у GeoJSON FeatureCollection",
+    "kropyva": "Один GeoJSON Feature — для прямого імпорту на мапу",
+    "odin": "C2-envelope з timestamp/actor/subject/geo",
+    "sap": "Плоский one-level запис з PascalCase полями",
+    "generic": "Pass-through {event, data} envelope",
+    "telegram": "Повідомлення в Telegram-чат/канал через Bot API (target_url = chat_id, secret = токен бота)"
+  }
+}

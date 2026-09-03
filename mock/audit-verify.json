@@ -1,0 +1,6 @@
+{
+  "ok": true,
+  "checked": 142,
+  "broken_at_id": null,
+  "message": "Chain integrity verified — 142 entries traversed cleanly from genesis to head."
+}
